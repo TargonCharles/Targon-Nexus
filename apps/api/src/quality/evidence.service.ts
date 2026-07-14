@@ -115,20 +115,28 @@ export class EvidenceService {
     let created = 0;
     let linked = 0;
 
-    // 查找缺少证据的 ADVISOR_OF 关系
-    const unverified = await this.neo4j.read<{ src: string; tgt: string; source: string }>(
-      `MATCH (a:Person)-[r:ADVISOR_OF]->(b:Person)
+    // 查找所有缺少证据的关系（不限类型）
+    const unverified = await this.neo4j.read<{
+      src: string; tgt: string; relType: string; source: string;
+    }>(
+      `MATCH (a)-[r]->(b)
        WHERE r.evidenceUrl IS NULL
-       RETURN a.uuid AS src, b.uuid AS tgt, coalesce(r.source, 'manual') AS source
-       LIMIT 100`,
+         AND type(r) IN ['AFFILIATED_WITH','BELONGS_TO','MEMBER_OF','HAS_EQUIPMENT',
+                         'RESEARCHES_ON','WORKS_AT','COAUTHOR_WITH','ADVISOR_OF',
+                         'AUTHORED_BY','CITES','LOCATED_AT']
+       RETURN a.uuid AS src, b.uuid AS tgt, type(r) AS relType,
+              coalesce(r.source, 'csv_import') AS source
+       LIMIT 500`,
     );
 
     for (const row of unverified) {
+      if (!VALID_RELATIONSHIP_TYPES.has(row.relType)) continue;
+
       const evUuid = await this.createEvidence({
-        sourceUrl: `neo4j://relationship/advisor_of`,
-        excerpt: `Advisor-student relationship between ${row.src} and ${row.tgt}`,
-        evidenceType: row.source === 'manual' ? 'manual' : 'llm_extraction',
-        confidence: row.source === 'manual' ? 0.95 : 0.7,
+        sourceUrl: `neo4j://relationship/${row.relType.toLowerCase()}`,
+        excerpt: `${row.relType} relationship between ${row.src} and ${row.tgt}`,
+        evidenceType: row.source === 'manual' ? 'manual' : 'csv_import',
+        confidence: row.source === 'manual' ? 0.95 : 0.8,
       });
       created++;
 
@@ -136,11 +144,12 @@ export class EvidenceService {
         evidenceUuid: evUuid,
         sourceUuid: row.src,
         targetUuid: row.tgt,
-        relationshipType: 'ADVISOR_OF',
+        relationshipType: row.relType,
       }).catch(() => {});
       linked++;
     }
 
+    this.logger.log(`Evidence backfill: ${created} created, ${linked} linked`);
     return { created, linked };
   }
 
