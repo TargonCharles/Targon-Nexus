@@ -89,51 +89,47 @@ export class EquipmentIntelService {
     }));
   }
 
-  /** 发现潜在销售机会 */
+  /** 发现潜在销售机会 — 单次批量查询替代 N+1 */
   async discoverSalesLeads(): Promise<SalesLead[]> {
-    // 找出有某种品类设备但缺少同品类其他品牌的实验室
-    const leads: SalesLead[] = [];
-
-    const labs = await this.neo4j.read<{
+    // 批量查询：对每个 lab 列出它拥有的品牌和所在品类中缺少的品牌
+    const results = await this.neo4j.read<{
       labName: string; instName: string; country: string;
       hasEquipment: string[]; categories: string[];
+      missingBrands: string[];
     }>(
       `MATCH (lab:Lab)-[:HAS_EQUIPMENT]->(e:Equipment)
        OPTIONAL MATCH (lab)-[:BELONGS_TO]->(univ:University)
-       WITH lab, univ, collect(DISTINCT e.name) AS equipment,
-               collect(DISTINCT e.category) AS categories
+       WITH lab, univ, e,
+            collect(DISTINCT e.name) AS equipment,
+            collect(DISTINCT e.category) AS categories
+       // 批量查找每个 lab 缺少的品牌：取所有该品类有设备的品牌，排除该 lab 已有的
+       OPTIONAL MATCH (other:Equipment)
+       WHERE other.category IN categories AND other.brand IS NOT NULL
+         AND NOT EXISTS {
+           MATCH (lab)-[:HAS_EQUIPMENT]->(:Equipment {brand: other.brand})
+         }
+       WITH lab, univ, equipment, categories,
+            collect(DISTINCT other.brand)[0..5] AS missingBrands
+       WHERE size(missingBrands) > 0
        RETURN lab.name AS labName,
               coalesce(univ.englishName, 'Unknown') AS instName,
               coalesce(lab.country, univ.country, 'Unknown') AS country,
               equipment AS hasEquipment,
-              categories`,
+              categories,
+              missingBrands`,
     );
 
-    for (const lab of labs) {
-      // 在同品类中找到该实验室没有的品牌
-      const missingBrands = await this.neo4j.read<{ brand: string }>(
-        `MATCH (e:Equipment) WHERE e.category IN $cats AND e.brand IS NOT NULL
-         AND NOT EXISTS {
-           MATCH (lab:Lab {name: $labName})-[:HAS_EQUIPMENT]->(:Equipment {brand: e.brand})
-         }
-         RETURN DISTINCT e.brand AS brand LIMIT 5`,
-        { cats: lab.categories, labName: lab.labName },
-      );
-
-      if (missingBrands.length > 0) {
-        leads.push({
-          labName: lab.labName,
-          institution: lab.instName,
-          country: lab.country,
-          hasEquipment: lab.hasEquipment,
-          missingEquipment: missingBrands.map((b) => b.brand),
-          potentialBrands: missingBrands.map((b) => b.brand),
-          score: Math.min(0.9, 0.3 + missingBrands.length * 0.15),
-        });
-      }
-    }
-
-    return leads.sort((a, b) => b.score - a.score);
+    return results
+      .map((lab) => ({
+        labName: lab.labName,
+        institution: lab.instName,
+        country: lab.country,
+        hasEquipment: lab.hasEquipment,
+        missingEquipment: lab.missingBrands,
+        potentialBrands: lab.missingBrands,
+        score: Math.min(0.9, 0.3 + lab.missingBrands.length * 0.15),
+      }))
+      .sort((a, b) => b.score - a.score);
   }
 
   /** 设备采购窗口预测 */

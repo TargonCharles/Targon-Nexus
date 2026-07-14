@@ -78,6 +78,19 @@ export function loadAgentDefinitions(agentsDir: string): AgentDefinition[] {
   return definitions;
 }
 
+/**
+ * 从 agents/ 目录加载 Agent 的 prompt.md 文件
+ */
+export function loadAgentPrompt(agentsDir: string, agentName: string): string | null {
+  const promptPath = path.join(agentsDir, agentName, 'prompt.md');
+  if (!fs.existsSync(promptPath)) return null;
+  try {
+    return fs.readFileSync(promptPath, 'utf-8');
+  } catch {
+    return null;
+  }
+}
+
 /** 简易 YAML 解析 — 只解析 agent.yaml 所需的结构 */
 function parseAgentYaml(content: string): AgentDefinition | null {
   const nameMatch = content.match(/^\s*name:\s*(.+?)\s*$/m);

@@ -3,6 +3,7 @@ import { Public } from '../auth';
 import { QualityService } from './quality.service';
 import { EvidenceService } from './evidence.service';
 import { CareerPathService } from './career-path.service';
+import { ValidationService } from './validation.service';
 
 @Controller('quality')
 export class QualityController {
@@ -10,6 +11,7 @@ export class QualityController {
     private readonly qualityService: QualityService,
     private readonly evidenceService: EvidenceService,
     private readonly careerPathService: CareerPathService,
+    private readonly validationService: ValidationService,
   ) {}
 
   /** DQ 报告 */
@@ -71,5 +73,12 @@ export class QualityController {
   async backfillCareer() {
     const result = await this.careerPathService.backfillKeyPeople();
     return { success: true, data: result };
+  }
+
+  /** 数据校验 — ORCID/邮箱/URL/置信度 */
+  @Post('validate')
+  async validate() {
+    const report = await this.validationService.validateAll();
+    return { success: true, data: report };
   }
 }

@@ -42,9 +42,44 @@ async function bootstrap() {
     }),
   );
 
-  // --- Health check (no auth required) ---
-  // Used by nginx, Docker HEALTHCHECK, and k8s liveness/readiness probes.
+  // --- HTTP adapter for health + metrics ---
   const httpAdapter = app.getHttpAdapter();
+
+  // --- Request counting (before routes are registered) ---
+  let requestCount = 0;
+  let errorCount = 0;
+  app.use((_req: any, _res: any, next: any) => {
+    requestCount++;
+    const originalEnd = _res.end;
+    _res.end = function (...args: any[]) {
+      if (_res.statusCode >= 400) errorCount++;
+      return originalEnd.apply(_res, args);
+    };
+    next();
+  });
+
+  // --- Prometheus metrics endpoint ---
+  httpAdapter.get('/api/metrics', (_req: any, res: any) => {
+    res.setHeader('Content-Type', 'text/plain');
+    const uptime = process.uptime();
+    const mem = process.memoryUsage();
+    res.status(200).send([
+      '# HELP http_requests_total Total HTTP requests',
+      '# TYPE http_requests_total counter',
+      `http_requests_total ${requestCount}`,
+      '# HELP http_errors_total Total HTTP errors',
+      '# TYPE http_errors_total counter',
+      `http_errors_total ${errorCount}`,
+      '# HELP process_uptime_seconds Process uptime in seconds',
+      '# TYPE process_uptime_seconds gauge',
+      `process_uptime_seconds ${uptime}`,
+      '# HELP nodejs_heap_used_bytes Node.js heap used',
+      '# TYPE nodejs_heap_used_bytes gauge',
+      `nodejs_heap_used_bytes ${mem.heapUsed}`,
+    ].join('\n'));
+  });
+
+  // --- Health check (no auth required) ---
   httpAdapter.get('/api/health', (_req: any, res: any) => {
     res.status(200).json({
       status: 'ok',

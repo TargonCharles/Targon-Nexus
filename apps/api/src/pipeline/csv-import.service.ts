@@ -5,6 +5,7 @@
 
 import { Injectable, Logger } from '@nestjs/common';
 import { Neo4jService } from '../neo4j/neo4j.service';
+import { promises as fsp } from 'fs';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -20,8 +21,8 @@ export class CsvImportService {
   constructor(private readonly neo4j: Neo4jService) {}
 
   /** 解析 CSV 文件 */
-  private parseCsv(filePath: string): { headers: string[]; rows: CsvRow[] } {
-    const content = fs.readFileSync(filePath, 'utf-8');
+  private async parseCsv(filePath: string): Promise<{ headers: string[]; rows: CsvRow[] }> {
+    const content = await fsp.readFile(filePath, 'utf-8');
     const lines = content.split(/\r?\n/).filter((l) => l.trim());
     if (lines.length < 2) return { headers: [], rows: [] };
 
@@ -69,7 +70,7 @@ export class CsvImportService {
     try {
       const uniPath = path.join(datasetDir, 'universities/seed.csv');
       if (fs.existsSync(uniPath)) {
-        const { rows } = this.parseCsv(uniPath);
+        const { rows } = await this.parseCsv(uniPath);
         universities = await this.importUniversities(rows);
         this.logger.log(`Universities: ${universities}`);
       }
@@ -79,7 +80,7 @@ export class CsvImportService {
     try {
       const profPath = path.join(datasetDir, 'professors/seed.csv');
       if (fs.existsSync(profPath)) {
-        const { rows } = this.parseCsv(profPath);
+        const { rows } = await this.parseCsv(profPath);
         professors = await this.importProfessors(rows);
         this.logger.log(`Professors: ${professors}`);
       }
@@ -89,7 +90,7 @@ export class CsvImportService {
     try {
       const labPath = path.join(datasetDir, 'labs/seed.csv');
       if (fs.existsSync(labPath)) {
-        const { rows } = this.parseCsv(labPath);
+        const { rows } = await this.parseCsv(labPath);
         labs = await this.importLabs(rows);
         this.logger.log(`Labs: ${labs}`);
       }
@@ -99,7 +100,7 @@ export class CsvImportService {
     try {
       const paperPath = path.join(datasetDir, 'papers/seed.csv');
       if (fs.existsSync(paperPath)) {
-        const { rows } = this.parseCsv(paperPath);
+        const { rows } = await this.parseCsv(paperPath);
         papers = await this.importPapers(rows);
         this.logger.log(`Papers: ${papers}`);
       }
@@ -109,7 +110,7 @@ export class CsvImportService {
     try {
       const eqPath = path.join(datasetDir, 'equipment/seed.csv');
       if (fs.existsSync(eqPath)) {
-        const { rows } = this.parseCsv(eqPath);
+        const { rows } = await this.parseCsv(eqPath);
         equipment = await this.importEquipment(rows);
         this.logger.log(`Equipment: ${equipment}`);
       }
@@ -119,7 +120,7 @@ export class CsvImportService {
     try {
       const facPath = path.join(datasetDir, 'synchrotrons/seed.csv');
       if (fs.existsSync(facPath)) {
-        const { rows } = this.parseCsv(facPath);
+        const { rows } = await this.parseCsv(facPath);
         facilities = await this.importFacilities(rows);
         this.logger.log(`Facilities: ${facilities}`);
       }
@@ -154,6 +155,7 @@ export class CsvImportService {
       const batch = rows.slice(b, b + batchSize);
       for (const row of batch) {
         try {
+          const uniUuid = row.universityUuid?.trim();
           await this.neo4j.write(
             `MERGE (p:Person {uuid: $uuid})
              ON CREATE SET p.chineseName=$cn, p.englishName=$en, p.orcid=$orcid,
@@ -162,12 +164,14 @@ export class CsvImportService {
                            p.createdAt=datetime(), p.updatedAt=datetime()
              ON MATCH SET p.researchInterests=split($ri,';'), p.updatedAt=datetime()
              WITH p
-             MATCH (u:University {uuid: $uniUuid})
-             MERGE (p)-[:AFFILIATED_WITH {confidence:0.8,source:'csv_import'}]->(u)
+             OPTIONAL MATCH (u:University {uuid: $uniUuid})
+             FOREACH (_ IN CASE WHEN u IS NOT NULL THEN [1] ELSE [] END |
+               MERGE (p)-[:AFFILIATED_WITH {confidence:0.8,source:'csv_import'}]->(u)
+             )
              RETURN p.uuid`,
             { uuid: row.uuid, cn: row.chineseName||null, en: row.englishName||null,
               orcid: row.orcid||null, hp: row.homepage||null, em: row.email||null,
-              ri: row.researchInterests||'', uniUuid: row.universityUuid||'missing' }
+              ri: row.researchInterests||'', uniUuid: uniUuid || null }
           );
           count++;
         } catch (e: any) { /* skip duplicates */ }
@@ -180,6 +184,7 @@ export class CsvImportService {
     let count = 0;
     for (const row of rows) {
       try {
+        const uniUuid = row.universityUuid?.trim();
         await this.neo4j.write(
           `MERGE (l:Lab {uuid: $uuid})
            ON CREATE SET l.name=$n, l.englishName=$en, l.abbreviation=$abbr,
@@ -189,13 +194,15 @@ export class CsvImportService {
                          l.createdAt=datetime(), l.updatedAt=datetime()
            ON MATCH SET l.updatedAt=datetime()
            WITH l
-           MATCH (u:University {uuid: $uniUuid})
-           MERGE (l)-[:BELONGS_TO {confidence:0.8,source:'csv_import'}]->(u)
+           OPTIONAL MATCH (u:University {uuid: $uniUuid})
+           FOREACH (_ IN CASE WHEN u IS NOT NULL THEN [1] ELSE [] END |
+             MERGE (l)-[:BELONGS_TO {confidence:0.8,source:'csv_import'}]->(u)
+           )
            RETURN l.uuid`,
           { uuid: row.uuid, n: row.name||null, en: row.englishName||null,
             abbr: row.abbreviation||null, hp: row.homepage||null, d: row.description||null,
             fy: row.foundedYear?parseInt(row.foundedYear):null, c: row.country||null,
-            ci: row.city||null, kw: row.keywords||'', uniUuid: row.universityUuid||'missing' }
+            ci: row.city||null, kw: row.keywords||'', uniUuid: uniUuid || null }
         );
         count++;
       } catch (e: any) { /* skip */ }

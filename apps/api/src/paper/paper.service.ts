@@ -3,6 +3,7 @@
 
 import { Injectable, Logger } from '@nestjs/common';
 import { Neo4jService } from '../neo4j/neo4j.service';
+import { paginate } from '@arp/shared';
 
 export interface PaperDetail {
   uuid: string;
@@ -92,8 +93,7 @@ export class PaperService {
 
   /** 引用此论文的其他论文 */
   async getCitations(uuid: string, opts?: { page?: number; pageSize?: number }): Promise<{ items: PaperReference[]; total: number }> {
-    const page = Math.max(1, opts?.page ?? 1);
-    const pageSize = Math.min(50, Math.max(1, opts?.pageSize ?? 20));
+    const { skip, limit } = paginate(opts, 50);
 
     const [items, countResult] = await Promise.all([
       this.neo4j.read<PaperReference>(
@@ -103,7 +103,7 @@ export class PaperService {
                 citing.citationCount AS citationCount
          ORDER BY citing.year DESC
          SKIP $skip LIMIT $limit`,
-        { uuid, skip: (page - 1) * pageSize, limit: pageSize },
+        { uuid, skip, limit },
       ),
       this.neo4j.read<{ total: number }>(
         `MATCH (:Paper)-[r:CITES]->(p:Paper {uuid: $uuid})
@@ -117,8 +117,7 @@ export class PaperService {
 
   /** 此论文引用了哪些论文 */
   async getReferences(uuid: string, opts?: { page?: number; pageSize?: number }): Promise<{ items: PaperReference[]; total: number }> {
-    const page = Math.max(1, opts?.page ?? 1);
-    const pageSize = Math.min(50, Math.max(1, opts?.pageSize ?? 20));
+    const { skip, limit } = paginate(opts, 50);
 
     const [items, countResult] = await Promise.all([
       this.neo4j.read<PaperReference>(
@@ -128,7 +127,7 @@ export class PaperService {
                 ref.citationCount AS citationCount
          ORDER BY ref.year DESC
          SKIP $skip LIMIT $limit`,
-        { uuid, skip: (page - 1) * pageSize, limit: pageSize },
+        { uuid, skip, limit },
       ),
       this.neo4j.read<{ total: number }>(
         `MATCH (p:Paper {uuid: $uuid})-[r:CITES]->(:Paper)

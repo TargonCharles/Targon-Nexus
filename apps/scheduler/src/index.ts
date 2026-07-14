@@ -39,6 +39,33 @@ function recordTask(name: string, status: TaskStatus): void {
   taskHistory.set(name, history);
 }
 
+/** 统一的定时任务包装器：自动记录执行历史和异常 */
+async function runScheduledTask(
+  taskName: string,
+  fn: () => Promise<void>,
+): Promise<void> {
+  const startTime = Date.now();
+  try {
+    await fn();
+    recordTask(taskName, {
+      taskName,
+      status: 'completed',
+      startedAt: new Date(startTime).toISOString(),
+      completedAt: new Date().toISOString(),
+      durationMs: Date.now() - startTime,
+    });
+  } catch (err: any) {
+    logger.error({ err, taskName }, 'Scheduled task failed');
+    recordTask(taskName, {
+      taskName,
+      status: 'failed',
+      startedAt: new Date(startTime).toISOString(),
+      completedAt: new Date().toISOString(),
+      error: err.message,
+    });
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Seed sources — known ARPES labs, institutions, and researchers
 // ---------------------------------------------------------------------------
@@ -72,67 +99,21 @@ async function runDailyCrawl(): Promise<void> {
   const taskName = 'daily-crawl';
   logger.info('Starting daily re-crawl...');
 
-  const startTime = Date.now();
-
-  try {
-    // Crawl known lab homepages
+  await runScheduledTask(taskName, async () => {
     const labSeeds = ARPES_SEEDS['lab-homepage'];
     if (labSeeds.length > 0) {
-      await crawlQueue.add(
-        'daily-crawl-labs',
-        {
-          seeds: labSeeds,
-          sourceType: 'lab-homepage',
-          maxPagesPerSeed: 50,
-          depth: 2,
-        },
-        {
-          priority: 2,
-          removeOnComplete: { count: 100 },
-          removeOnFail: { count: 100 },
-        },
-      );
+      await crawlQueue.add('daily-crawl-labs', {
+        seeds: labSeeds, sourceType: 'lab-homepage', maxPagesPerSeed: 50, depth: 2,
+      }, { priority: 2, removeOnComplete: { count: 100 }, removeOnFail: { count: 100 } });
     }
 
-    // Crawl arXiv for new papers
     const arxivSeeds = ARPES_SEEDS['arxiv'];
     if (arxivSeeds.length > 0) {
-      await crawlQueue.add(
-        'daily-crawl-arxiv',
-        {
-          seeds: arxivSeeds,
-          sourceType: 'arxiv',
-          maxPagesPerSeed: 30,
-          depth: 1,
-        },
-        {
-          priority: 3,
-          removeOnComplete: { count: 100 },
-          removeOnFail: { count: 100 },
-        },
-      );
+      await crawlQueue.add('daily-crawl-arxiv', {
+        seeds: arxivSeeds, sourceType: 'arxiv', maxPagesPerSeed: 30, depth: 1,
+      }, { priority: 3, removeOnComplete: { count: 100 }, removeOnFail: { count: 100 } });
     }
-
-    const duration = Date.now() - startTime;
-    recordTask(taskName, {
-      taskName,
-      status: 'completed',
-      startedAt: new Date(startTime).toISOString(),
-      completedAt: new Date().toISOString(),
-      durationMs: duration,
-    });
-
-    logger.info({ durationMs: duration }, 'Daily re-crawl dispatched');
-  } catch (err: any) {
-    logger.error({ err }, 'Daily re-crawl failed');
-    recordTask(taskName, {
-      taskName,
-      status: 'failed',
-      startedAt: new Date(startTime).toISOString(),
-      completedAt: new Date().toISOString(),
-      error: err.message,
-    });
-  }
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -142,31 +123,10 @@ async function runReExtraction(): Promise<void> {
   const taskName = 're-extraction';
   logger.info('Starting re-extraction...');
 
-  const startTime = Date.now();
-
-  try {
-    // Pull pages that haven't been extracted yet from the parse queue
-    // In production this would query the DB for delta pages since last extraction
+  await runScheduledTask(taskName, async () => {
     const jobCounts = await extractQueue.getJobCounts();
     logger.info({ jobCounts }, 'Extract queue status');
-
-    recordTask(taskName, {
-      taskName,
-      status: 'completed',
-      startedAt: new Date(startTime).toISOString(),
-      completedAt: new Date().toISOString(),
-      durationMs: Date.now() - startTime,
-      metadata: { waitingJobs: jobCounts.waiting },
-    });
-  } catch (err: any) {
-    logger.error({ err }, 'Re-extraction failed');
-    recordTask(taskName, {
-      taskName,
-      status: 'failed',
-      startedAt: new Date(startTime).toISOString(),
-      error: err.message,
-    });
-  }
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -176,44 +136,11 @@ async function runGraphUpdate(): Promise<void> {
   const taskName = 'graph-update';
   logger.info('Starting graph update...');
 
-  const startTime = Date.now();
-
-  try {
-    // Trigger a global graph rebuild with all resolved entities
-    await buildGraphQueue.add(
-      'scheduled-graph-update',
-      {
-        entities: [], // Would be populated from resolve queue results
-        relationships: [],
-        timelineEvents: [],
-        fullBuild: true,
-      },
-      {
-        priority: 5,
-        removeOnComplete: { count: 50 },
-        removeOnFail: { count: 50 },
-      },
-    );
-
-    const duration = Date.now() - startTime;
-    recordTask(taskName, {
-      taskName,
-      status: 'completed',
-      startedAt: new Date(startTime).toISOString(),
-      completedAt: new Date().toISOString(),
-      durationMs: duration,
-    });
-
-    logger.info({ durationMs: duration }, 'Graph update dispatched');
-  } catch (err: any) {
-    logger.error({ err }, 'Graph update failed');
-    recordTask(taskName, {
-      taskName,
-      status: 'failed',
-      startedAt: new Date(startTime).toISOString(),
-      error: err.message,
-    });
-  }
+  await runScheduledTask(taskName, async () => {
+    await buildGraphQueue.add('scheduled-graph-update', {
+      entities: [], relationships: [], timelineEvents: [], fullBuild: true,
+    }, { priority: 5, removeOnComplete: { count: 50 }, removeOnFail: { count: 50 } });
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -223,63 +150,18 @@ async function runWeeklyDiscovery(): Promise<void> {
   const taskName = 'weekly-discovery';
   logger.info('Starting weekly discovery...');
 
-  const startTime = Date.now();
+  await runScheduledTask(taskName, async () => {
+    await discoveryQueue.add('weekly-discovery', {
+      method: 'citation-graph', sources: ['arxiv', 'crossref', 'dblp'],
+      maxNewNodes: 200, minConfidence: 0.7,
+    }, { priority: 1, removeOnComplete: { count: 20 }, removeOnFail: { count: 20 } });
 
-  try {
-    await discoveryQueue.add(
-      'weekly-discovery',
-      {
-        method: 'citation-graph',
-        sources: ['arxiv', 'crossref', 'dblp'],
-        maxNewNodes: 200,
-        minConfidence: 0.7,
-      },
-      {
-        priority: 1,
-        removeOnComplete: { count: 20 },
-        removeOnFail: { count: 20 },
-      },
-    );
-
-    await discoveryQueue.add(
-      'weekly-discovery-web',
-      {
-        method: 'web-search',
-        sources: ['google-scholar', 'researchgate'],
-        queries: [
-          'ARPES angle-resolved photoemission spectroscopy 2025',
-          'ARPES lab new group',
-          'ARPES topological materials',
-        ],
-        maxNewNodes: 100,
-        minConfidence: 0.6,
-      },
-      {
-        priority: 2,
-        removeOnComplete: { count: 20 },
-        removeOnFail: { count: 20 },
-      },
-    );
-
-    const duration = Date.now() - startTime;
-    recordTask(taskName, {
-      taskName,
-      status: 'completed',
-      startedAt: new Date(startTime).toISOString(),
-      completedAt: new Date().toISOString(),
-      durationMs: duration,
-    });
-
-    logger.info({ durationMs: duration }, 'Weekly discovery dispatched');
-  } catch (err: any) {
-    logger.error({ err }, 'Weekly discovery failed');
-    recordTask(taskName, {
-      taskName,
-      status: 'failed',
-      startedAt: new Date(startTime).toISOString(),
-      error: err.message,
-    });
-  }
+    await discoveryQueue.add('weekly-discovery-web', {
+      method: 'web-search', sources: ['google-scholar', 'researchgate'],
+      queries: ['ARPES angle-resolved photoemission spectroscopy 2025', 'ARPES lab new group', 'ARPES topological materials'],
+      maxNewNodes: 100, minConfidence: 0.6,
+    }, { priority: 2, removeOnComplete: { count: 20 }, removeOnFail: { count: 20 } });
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -289,42 +171,12 @@ async function runValidation(): Promise<void> {
   const taskName = 'graph-validation';
   logger.info('Starting graph validation...');
 
-  const startTime = Date.now();
-
-  try {
-    await validateQueue.add(
-      'daily-validation',
-      {
-        checks: [
-          'orphan-nodes',
-          'broken-relationships',
-          'inconsistent-timeline',
-          'duplicate-entities',
-          'confidence-threshold',
-        ],
-        autoRepair: true,
-        reportDestination: 'slack',
-      },
-      {
-        priority: 1,
-        removeOnComplete: { count: 100 },
-        removeOnFail: { count: 100 },
-      },
-    );
-
-    const duration = Date.now() - startTime;
-    recordTask(taskName, {
-      taskName,
-      status: 'completed',
-      startedAt: new Date(startTime).toISOString(),
-      completedAt: new Date().toISOString(),
-      durationMs: duration,
-    });
-
-    logger.info({ durationMs: duration }, 'Graph validation dispatched');
-  } catch (err: any) {
-    logger.error({ err }, 'Graph validation failed');
-  }
+  await runScheduledTask(taskName, async () => {
+    await validateQueue.add('daily-validation', {
+      checks: ['orphan-nodes', 'broken-relationships', 'inconsistent-timeline', 'duplicate-entities', 'confidence-threshold'],
+      autoRepair: true, reportDestination: 'slack',
+    }, { priority: 1, removeOnComplete: { count: 100 }, removeOnFail: { count: 100 } });
+  });
 }
 
 // ---------------------------------------------------------------------------

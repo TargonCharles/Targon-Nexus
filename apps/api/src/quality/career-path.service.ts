@@ -25,6 +25,7 @@ export class CareerPathService {
     return this.neo4j.read<CareerEvent>(
       `MATCH (p:Person {uuid: $uuid})
        OPTIONAL MATCH (p)-[:HAS_CAREER_EVENT]->(e:CareerEvent)
+       WHERE e IS NOT NULL
        RETURN e.uuid AS uuid, p.uuid AS personUuid,
               coalesce(p.chineseName, p.englishName) AS personName,
               e.eventType AS eventType, e.institution AS institution,

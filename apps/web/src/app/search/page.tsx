@@ -1,7 +1,7 @@
 'use client';
 
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Suspense, useState, useEffect, useCallback, useRef } from 'react';
+import { Suspense, useState, useEffect, useCallback } from 'react';
 import { search, SearchResult } from '@/lib/api';
 import Link from 'next/link';
 
@@ -10,6 +10,20 @@ interface Facets { types: {value:string;count:number}[]; countries: {value:strin
 const TYPE_LABELS: Record<string, string> = { person: '人物', lab: '实验室', university: '机构', equipment: '设备', research_direction: '方向', paper: '论文', facility: '设施' };
 const BADGE_COLORS: Record<string, string> = { person: 'bg-blue-100 text-blue-700', lab: 'bg-green-100 text-green-700', university: 'bg-purple-100 text-purple-700', equipment: 'bg-orange-100 text-orange-700', research_direction: 'bg-teal-100 text-teal-700', paper: 'bg-gray-100 text-gray-700', facility: 'bg-violet-100 text-violet-700' };
 
+const PAGE_SIZE = 20;
+
+function highlightMatches(text: string, query: string): React.ReactNode {
+  if (!query || query.length < 2) return text;
+  try {
+    const parts = text.split(new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi'));
+    return parts.map((part, i) =>
+      part.toLowerCase() === query.toLowerCase()
+        ? <mark key={i} className="bg-yellow-200 rounded px-0.5">{part}</mark>
+        : part
+    );
+  } catch { return text; }
+}
+
 function SearchContent() {
   const params = useSearchParams();
   const router = useRouter();
@@ -17,6 +31,7 @@ function SearchContent() {
   const activeType = params.get('type') || '';
   const activeCountry = params.get('country') || '';
   const activeField = params.get('field') || '';
+  const activePage = parseInt(params.get('page') || '1', 10);
 
   const [results, setResults] = useState<SearchResult[]>([]);
   const [facets, setFacets] = useState<Facets | null>(null);
@@ -24,17 +39,25 @@ function SearchContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
   const doSearch = useCallback(async () => {
     if (!q) return;
     setLoading(true); setError('');
     try {
-      const res: any = await search(q, activeType || undefined);
-      setResults(res.data || []);
-      setTotal(res.meta?.total || 0);
-      setFacets(res.facets || null);
+      const res: any = await search(q, {
+        type: activeType || undefined,
+        country: activeCountry || undefined,
+        field: activeField || undefined,
+        page: activePage,
+        pageSize: PAGE_SIZE,
+      });
+      setResults(res.data?.items || res.data || []);
+      setTotal(res.data?.total ?? res.meta?.total ?? 0);
+      setFacets(res.data?.facets ?? res.facets ?? null);
     } catch { setError('搜索失败'); }
     finally { setLoading(false); }
-  }, [q, activeType]);
+  }, [q, activeType, activeCountry, activeField, activePage]);
 
   useEffect(() => { doSearch(); }, [doSearch]);
 
@@ -113,26 +136,57 @@ function SearchContent() {
 
           {/* Results */}
           <div className="flex-1 min-w-0">
-            {loading && <div className="py-12 text-center text-gray-400"><div className="animate-spin inline-block w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full mr-2" /> 搜索中…</div>}
+            {loading && <div className="py-12 text-center text-gray-400"><div className="animate-spin inline-block w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full mr-2" />搜索中…</div>}
             {error && <div className="py-8 text-center text-red-500">{error}</div>}
             {!loading && !error && q && (
               <>
-                <p className="mb-4 text-sm text-gray-500">共 {total} 条结果「{q}」{activeType ? ` · ${TYPE_LABELS[activeType] || activeType}` : ''}</p>
+                <p className="mb-4 text-sm text-gray-500">
+                  共 {total} 条结果「{q}」{activeType ? ` · ${TYPE_LABELS[activeType] || activeType}` : ''}
+                  {activeCountry ? ` · ${activeCountry}` : ''}{activeField ? ` · ${activeField}` : ''}
+                </p>
                 <div className="space-y-3">
                   {results.map((r) => (
                     <Link key={r.uuid} href={getLink(r)} className="block rounded-xl border bg-white p-4 shadow-sm hover:shadow-md hover:border-blue-300 transition-all">
                       <div className="flex items-start justify-between">
                         <div>
                           <span className={`inline-block rounded px-2 py-0.5 text-xs font-medium mr-2 ${BADGE_COLORS[r.type] || 'bg-gray-100'}`}>{TYPE_LABELS[r.type] || r.type}</span>
-                          <span className="font-semibold text-gray-900">{r.name}</span>
+                          <span className="font-semibold text-gray-900">{highlightMatches(r.name, q)}</span>
                         </div>
-                        {r.score != null && <span className="text-xs text-gray-400">{(r.score * 100).toFixed(0)}%</span>}
+                        {r.score != null && <span className="text-xs text-gray-400 shrink-0 ml-2">{(r.score * 100).toFixed(0)}%</span>}
                       </div>
-                      {r.subtitle && <p className="mt-1 text-sm text-gray-500">{r.subtitle}</p>}
+                      {r.subtitle && <p className="mt-1 text-sm text-gray-500">{highlightMatches(r.subtitle, q)}</p>}
                     </Link>
                   ))}
                   {results.length === 0 && <div className="rounded-xl border bg-white py-12 text-center text-gray-400"><p className="text-2xl mb-2">🔍</p><p>未找到结果</p></div>}
                 </div>
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="mt-6 flex items-center justify-center gap-2">
+                    <button
+                      onClick={() => nav('page', String(activePage - 1))}
+                      disabled={activePage <= 1}
+                      className="px-3 py-1.5 rounded-lg border text-sm disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-50"
+                    >上一页</button>
+                    {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+                      const start = Math.max(1, Math.min(activePage - 3, totalPages - 6));
+                      const pageNum = start + i;
+                      if (pageNum > totalPages) return null;
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => nav('page', String(pageNum))}
+                          className={`w-8 h-8 rounded-lg text-sm font-medium ${pageNum === activePage ? 'bg-blue-600 text-white' : 'border hover:bg-gray-50'}`}
+                        >{pageNum}</button>
+                      );
+                    })}
+                    <button
+                      onClick={() => nav('page', String(activePage + 1))}
+                      disabled={activePage >= totalPages}
+                      className="px-3 py-1.5 rounded-lg border text-sm disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-50"
+                    >下一页</button>
+                  </div>
+                )}
               </>
             )}
             {!q && <div className="rounded-xl border bg-white py-16 text-center text-gray-400"><p className="text-lg">输入关键词开始探索科研关系网络</p></div>}

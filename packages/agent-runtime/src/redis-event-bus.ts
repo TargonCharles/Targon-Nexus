@@ -15,15 +15,32 @@ export interface RedisAdapter {
 
 /** 基于 ioredis 的 Redis 适配器 */
 export function createIORedisAdapter(redisClient: any): RedisAdapter {
+  const messageHandlers = new Map<string, (ch: string, msg: string) => void>();
+
   return {
     publish: (channel, message) => redisClient.publish(channel, message),
     subscribe: (channel, handler) => {
-      redisClient.on('message', (ch: string, msg: string) => {
+      // 移除该 channel 的旧 handler，防止重复监听
+      const oldHandler = messageHandlers.get(channel);
+      if (oldHandler) {
+        redisClient.off('message', oldHandler);
+      }
+      // 创建新的过滤器并注册
+      const filterHandler = (ch: string, msg: string) => {
         if (ch === channel) handler(ch, msg);
-      });
+      };
+      redisClient.on('message', filterHandler);
+      messageHandlers.set(channel, filterHandler);
       return redisClient.subscribe(channel);
     },
-    unsubscribe: (channel) => redisClient.unsubscribe(channel),
+    unsubscribe: (channel) => {
+      const handler = messageHandlers.get(channel);
+      if (handler) {
+        redisClient.off('message', handler);
+        messageHandlers.delete(channel);
+      }
+      return redisClient.unsubscribe(channel);
+    },
     get isOpen() {
       return redisClient.status === 'ready';
     },
@@ -147,17 +164,17 @@ export class RedisEventBus implements IEventBus {
   /** 等待特定事件 */
   async waitFor(eventType: string, timeoutMs: number = 60000): Promise<AgentEvent> {
     return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
-        const resolvers = this.waitResolvers.get(eventType) || [];
-        const idx = resolvers.indexOf(resolve);
-        if (idx >= 0) resolvers.splice(idx, 1);
-        reject(new Error(`RedisEventBus: Timeout waiting for "${eventType}" (${timeoutMs}ms)`));
-      }, timeoutMs);
-
       const wrappedResolve = (event: AgentEvent) => {
         clearTimeout(timer);
         resolve(event);
       };
+
+      const timer = setTimeout(() => {
+        const resolvers = this.waitResolvers.get(eventType) || [];
+        const idx = resolvers.indexOf(wrappedResolve);
+        if (idx >= 0) resolvers.splice(idx, 1);
+        reject(new Error(`RedisEventBus: Timeout waiting for "${eventType}" (${timeoutMs}ms)`));
+      }, timeoutMs);
 
       const resolvers = this.waitResolvers.get(eventType) || [];
       resolvers.push(wrappedResolve);

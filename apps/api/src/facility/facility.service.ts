@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Neo4jService } from '../neo4j/neo4j.service';
+import { paginate } from '@arp/shared';
 
 export interface FacilityDetail {
   uuid: string;
@@ -37,8 +38,7 @@ export class FacilityService {
   }
 
   async listAll(opts?: { page?: number; pageSize?: number }): Promise<{ items: FacilityDetail[]; total: number }> {
-    const page = Math.max(1, opts?.page ?? 1);
-    const pageSize = Math.min(100, Math.max(1, opts?.pageSize ?? 50));
+    const { skip, limit } = paginate(opts, 100);
 
     const [items, countResult] = await Promise.all([
       this.neo4j.read<FacilityDetail>(
@@ -49,7 +49,7 @@ export class FacilityService {
                 toString(f.createdAt) AS createdAt
          ORDER BY f.country, f.name
          SKIP $skip LIMIT $limit`,
-        { skip: (page - 1) * pageSize, limit: pageSize },
+        { skip, limit },
       ),
       this.neo4j.read<{ total: number }>(
         `MATCH (f:Facility) RETURN count(f) AS total`,
@@ -73,8 +73,10 @@ export class FacilityService {
 
   async getFacilityGraph(uuid: string): Promise<GraphData> {
     const results = await this.neo4j.read<{
-      nodeUuid: string; nodeType: string; nodeLabel: string; nodeProps: string;
-      edgeSource: string; edgeTarget: string; edgeType: string; edgeLabel: string; edgeProps: string;
+      nodeUuid: string; nodeType: string; nodeLabel: string;
+      description: string; facilityType: string;
+      edgeSource: string; edgeTarget: string; edgeType: string; edgeLabel: string;
+      confidence: number;
     }>(
       `MATCH (f:Facility {uuid: $uuid})
        OPTIONAL MATCH (f)-[r]-(related)
@@ -83,12 +85,13 @@ export class FacilityService {
          f.uuid AS nodeUuid,
          'Facility' AS nodeType,
          coalesce(f.englishName, f.name) AS nodeLabel,
-         toString(properties(f)) AS nodeProps,
+         f.description AS description,
+         f.facilityType AS facilityType,
          null AS edgeSource,
          null AS edgeTarget,
          null AS edgeType,
          null AS edgeLabel,
-         null AS edgeProps
+         null AS confidence
        UNION
        MATCH (f:Facility {uuid: $uuid})-[r]-(related)
        WHERE labels(related)[0] IN ['Person', 'Lab', 'University', 'Equipment', 'ResearchDirection']
@@ -96,12 +99,13 @@ export class FacilityService {
          related.uuid AS nodeUuid,
          labels(related)[0] AS nodeType,
          coalesce(related.englishName, related.name, related.title) AS nodeLabel,
-         toString(properties(related)) AS nodeProps,
+         related.description AS description,
+         null AS facilityType,
          startNode(r).uuid AS edgeSource,
          endNode(r).uuid AS edgeTarget,
          type(r) AS edgeType,
          type(r) AS edgeLabel,
-         toString(properties(r)) AS edgeProps`,
+         r.confidence AS confidence`,
       { uuid },
     );
 
@@ -110,14 +114,15 @@ export class FacilityService {
 
     for (const row of results) {
       if (row.nodeUuid) {
-        let props = {};
-        try { props = JSON.parse(row.nodeProps); } catch { /* ignore */ }
         if (!nodesMap.has(row.nodeUuid)) {
           nodesMap.set(row.nodeUuid, {
             uuid: row.nodeUuid,
             type: row.nodeType?.toLowerCase() || 'facility',
             label: row.nodeLabel || 'Unknown',
-            properties: props,
+            properties: {
+              description: row.description || null,
+              facilityType: row.facilityType || null,
+            },
             degree: 0,
           });
         }
@@ -125,14 +130,12 @@ export class FacilityService {
       if (row.edgeSource && row.edgeTarget) {
         const key = `${row.edgeSource}|${row.edgeType}|${row.edgeTarget}`;
         if (!edgesMap.has(key)) {
-          let props = {};
-          try { props = JSON.parse(row.edgeProps); } catch { /* ignore */ }
           edgesMap.set(key, {
             source: row.edgeSource,
             target: row.edgeTarget,
             type: row.edgeType || 'LOCATED_AT',
             label: row.edgeLabel || '',
-            properties: props,
+            properties: { confidence: row.confidence ?? null },
           });
         }
       }

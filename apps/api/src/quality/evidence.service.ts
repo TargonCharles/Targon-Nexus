@@ -1,6 +1,14 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { Neo4jService } from '../neo4j/neo4j.service';
 import { generateUUID } from '@arp/shared';
+
+/** 合法的关系类型白名单 — 防止 Cypher 注入 */
+const VALID_RELATIONSHIP_TYPES = new Set([
+  'ADVISOR_OF', 'AUTHORED_BY', 'AFFILIATED_WITH', 'BELONGS_TO',
+  'MEMBER_OF', 'RESEARCHES_ON', 'CITES', 'HAS_EQUIPMENT',
+  'HAS_CAREER_EVENT', 'HAS_EVIDENCE', 'SOURCED_FROM',
+  'LOCATED_AT', 'OPERATED_BY', 'MANUFACTURED_BY',
+]);
 
 export interface EvidenceNode {
   uuid: string;
@@ -55,6 +63,11 @@ export class EvidenceService {
     targetUuid: string;
     relationshipType: string;
   }): Promise<void> {
+    // 校验关系类型，防止 Cypher 注入
+    if (!VALID_RELATIONSHIP_TYPES.has(params.relationshipType)) {
+      throw new BadRequestException(`Invalid relationship type: ${params.relationshipType}`);
+    }
+
     await this.neo4j.write(
       `MATCH (e:Evidence {uuid: $evUuid})
        MATCH (a {uuid: $srcUuid})-[r:${params.relationshipType}]->(b {uuid: $tgtUuid})
@@ -113,6 +126,7 @@ export class EvidenceService {
         evidenceType: row.source === 'manual' ? 'manual' : 'llm_extraction',
         confidence: row.source === 'manual' ? 0.95 : 0.7,
       });
+      created++;
 
       await this.linkEvidenceToRelationship({
         evidenceUuid: evUuid,

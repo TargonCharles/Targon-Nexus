@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { getPerson, getPersonStudents, getPersonAdvisors, getPersonGenealogy, getPersonCareer, GraphData } from '@/lib/api';
+import { getPerson, getPersonStudents, getPersonAdvisors, getPersonGenealogy, getPersonGraph, getPersonCareer, GraphData } from '@/lib/api';
 import GraphCanvas from '@/components/GraphCanvas';
 import GenealogyTree from '@/components/GenealogyTree';
 
@@ -18,6 +18,7 @@ export default function PersonPage() {
   const [students, setStudents] = useState<any[]>([]);
   const [advisors, setAdvisors] = useState<any[]>([]);
   const [genealogy, setGenealogy] = useState<GraphData | null>(null);
+  const [relationGraph, setRelationGraph] = useState<GraphData | null>(null);
   const [career, setCareer] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -27,8 +28,9 @@ export default function PersonPage() {
     async function load() {
       setLoading(true); setError(null);
       try {
-        const [pRes, sRes, aRes, gRes, cRes] = await Promise.all([
+        const [pRes, sRes, aRes, gRes, grRes, cRes] = await Promise.all([
           getPerson(uuid), getPersonStudents(uuid), getPersonAdvisors(uuid), getPersonGenealogy(uuid),
+          getPersonGraph(uuid).catch(() => ({ data: null } as any)),
           getPersonCareer(uuid).catch(() => ({ data: [] })),
         ]);
         if (cancelled) return;
@@ -36,6 +38,7 @@ export default function PersonPage() {
         setStudents(sRes.data || []);
         setAdvisors(aRes.data || []);
         setGenealogy(gRes.data);
+        setRelationGraph((grRes as any)?.data || null);
         setCareer((cRes as any)?.data || []);
       } catch (err: any) {
         if (cancelled) return;
@@ -95,6 +98,14 @@ export default function PersonPage() {
           </a>
         )}
       </div>
+
+      {/* ===== 关系图谱 ===== */}
+      {relationGraph && relationGraph.nodes?.length > 0 && (
+        <section className="mt-8 rounded-xl border bg-white p-5">
+          <h2 className="text-lg font-bold mb-3">🕸️ 关系网络</h2>
+          <GraphCanvas data={relationGraph} height={400} onNodeClick={(id) => window.open(`/person/${id}`, '_self')} />
+        </section>
+      )}
 
       {/* ===== 学术家谱图谱 ===== */}
       <section className="mt-8">

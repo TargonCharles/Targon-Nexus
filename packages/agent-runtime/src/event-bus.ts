@@ -69,18 +69,18 @@ export class EventBus implements IEventBus {
   /** 等待特定类型的事件（带超时） */
   async waitFor(eventType: string, timeoutMs: number = 60000): Promise<AgentEvent> {
     return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
-        // 清理 resolver
-        const resolvers = this.waitResolvers.get(eventType) || [];
-        const idx = resolvers.indexOf(resolve);
-        if (idx >= 0) resolvers.splice(idx, 1);
-        reject(new Error(`Timeout waiting for event "${eventType}" (${timeoutMs}ms)`));
-      }, timeoutMs);
-
       const wrappedResolve = (event: AgentEvent) => {
         clearTimeout(timer);
         resolve(event);
       };
+
+      const timer = setTimeout(() => {
+        // 清理 resolver
+        const resolvers = this.waitResolvers.get(eventType) || [];
+        const idx = resolvers.indexOf(wrappedResolve);
+        if (idx >= 0) resolvers.splice(idx, 1);
+        reject(new Error(`Timeout waiting for event "${eventType}" (${timeoutMs}ms)`));
+      }, timeoutMs);
 
       const resolvers = this.waitResolvers.get(eventType) || [];
       resolvers.push(wrappedResolve);

@@ -131,6 +131,15 @@ export type { Logger } from "./logger";
 
 export { generateId, generateRandomId } from "./id";
 
+// -- Pagination helper -------------------------------------------------------
+
+export { paginate } from "./pagination";
+export type { PaginationOpts, PaginationResult } from "./pagination";
+
+// -- JSON extraction helper --------------------------------------------------
+
+export { extractJsonArray } from "./json";
+
 // -- Graph utilities --------------------------------------------------------
 
 export { buildGraphFromRows, parseArrayProperty, getDisplayName } from "./graph";

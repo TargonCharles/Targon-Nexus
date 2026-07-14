@@ -3,7 +3,7 @@
 // =============================================================================
 
 export { EventBus } from './event-bus';
-export { AgentRegistry, loadAgentDefinitions } from './registry';
+export { AgentRegistry, loadAgentDefinitions, loadAgentPrompt } from './registry';
 export { PipelineOrchestrator } from './orchestrator';
 
 // Agent handlers

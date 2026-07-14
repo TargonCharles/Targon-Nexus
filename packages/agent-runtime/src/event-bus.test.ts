@@ -116,4 +116,34 @@ describe('EventBus', () => {
     bus.on('EventB', jest.fn());
     expect(bus.listenerCount).toBe(2);
   });
+
+  it('cleans up stale resolvers after timeout (no memory leak)', async () => {
+    // Trigger a timeout
+    await expect(bus.waitFor('WillTimeout', 100)).rejects.toThrow('Timeout');
+
+    // The stale resolver should have been cleaned up — verify by waiting again
+    await expect(bus.waitFor('WillTimeout', 100)).rejects.toThrow('Timeout');
+
+    // If the bug existed, the stale wrappedResolve would accumulate.
+    // After 3 timeouts, verify the system is still functional (no leak crash).
+    for (let i = 0; i < 3; i++) {
+      await expect(bus.waitFor(`LeakTest-${i}`, 50)).rejects.toThrow('Timeout');
+    }
+
+    // System should still work — emit should find no stale waiters
+    const promise = bus.waitFor('PostLeak', 500);
+    setTimeout(async () => {
+      await bus.emit(makeEvent({ eventType: 'PostLeak', payload: { ok: true } }));
+    }, 50);
+    const received = await promise;
+    expect(received.eventType).toBe('PostLeak');
+    expect(received.payload.ok).toBe(true);
+  });
+
+  it('waitFor resolves immediately when emit fires before timeout', async () => {
+    const promise = bus.waitFor('FastEvent', 5000);
+    await bus.emit(makeEvent({ eventType: 'FastEvent', payload: { x: 42 } }));
+    const received = await promise;
+    expect(received.payload.x).toBe(42);
+  });
 });

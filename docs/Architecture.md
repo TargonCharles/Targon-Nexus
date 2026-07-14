@@ -57,8 +57,30 @@ Targon Nexus 采用微服务 + Event-Driven 架构，以 **Neo4j 图数据库** 
 
 - **Framework**: NestJS
 - **Protocol**: REST + GraphQL
-- **Authentication**: JWT (simple, no multi-tenant)
-- **Rate Limiting**: ThrottlerModule
+- **Authentication**: JWT (global JwtAuthGuard + @Public() opt-out)
+- **Rate Limiting**: ThrottlerModule + ThrottlerGuard (100 req/min)
+- **Distributed Lock**: LockService (in-memory / Redis-swappable)
+- **HTTP Client**: HttpClientService (retry, timeout, UA header)
+- **LLM Client**: LlmClientService (OpenAI-compatible unified interface)
+
+#### Service Architecture
+
+```
+Controller Layer (thin — HTTP routing only)
+  ├── PipelineController  → PipelineService / DedupService / SeedService / LockService
+  ├── QualityController   → QualityService / EvidenceService / CareerPathService / ValidationService
+  ├── SearchController    → SearchService
+  ├── PersonController    → PersonService
+  ├── PaperController     → PaperService
+  ├── LabController       → LabService
+  └── ...                 → ...
+
+Shared Helpers (@arp/shared)
+  ├── paginate()          → 统一分页计算
+  ├── extractJsonArray()  → LLM 响应 JSON 解析
+  ├── generateUUID()      → UUID v4 生成
+  └── buildGraphFromRows()→ Neo4j 行 → 图谱结构
+```
 
 ### 3. Data Pipeline Layer
 
@@ -69,10 +91,13 @@ Discovery → Crawler → Parser → Extractor → Identity Resolution → Graph
 | Service | Technology | Responsibility |
 |---------|-----------|---------------|
 | crawler | Playwright + Crawlee | Web scraping, PDF download |
-| extractor | LLM (OpenAI Compatible) | Entity/relationship extraction |
+| extractor | LLM (OpenAI Compatible via LlmClientService) | Entity/relationship extraction |
 | graph-builder | Neo4j Driver | Node/Relationship/Evidence creation |
-| scheduler | BullMQ / Cron | Periodic sync, revalidation |
-| worker | BullMQ | Background job processing |
+| scheduler | BullMQ / Cron + runScheduledTask wrapper | Periodic sync, revalidation |
+| worker | BullMQ + singleton Neo4j driver | Background job processing |
+| dedup | Neo4j Cypher (DedupService) | 3-phase person dedup (ORCID/name/fuzzy) |
+| seed | Cypher file I/O (SeedService) | Seed data import with path safety |
+| validation | Neo4j queries (ValidationService) | ORCID/email/URL/confidence checks |
 
 ### 4. Storage Layer
 

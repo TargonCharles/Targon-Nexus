@@ -1,10 +1,13 @@
 // =============================================================================
 // Vector Service — 混合搜索（图谱 + 向量）
-// 支持 OpenAI Embeddings + Qdrant / 纯内存余弦相似度
+// 支持 OpenAI Embeddings + TF-IDF 双模式，可切换 Qdrant 向量数据库
 // =============================================================================
 
 import { Injectable, Logger } from '@nestjs/common';
 import { Neo4jService } from '../neo4j/neo4j.service';
+
+/** OpenAI Embedding 维度 */
+const OPENAI_EMBEDDING_DIM = 1536;
 
 export interface HybridSearchResult {
   uuid: string;
@@ -335,5 +338,67 @@ export class VectorService {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ points }),
     });
+  }
+
+  /**
+   * 使用 OpenAI Embeddings 批量构建向量索引（高质量语义搜索）
+   */
+  async buildIndexWithOpenAI(): Promise<{ indexed: number; model: string }> {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) throw new Error('OPENAI_API_KEY not configured');
+
+    const entities = await this.neo4j.read<{ uuid: string; type: string; name: string; description: string }>(
+      `MATCH (n) WHERE n:Person OR n:Paper OR n:Lab
+       RETURN n.uuid AS uuid, labels(n)[0] AS type,
+              coalesce(n.englishName, n.chineseName, n.name, n.title, '') AS name,
+              coalesce(n.description, n.biography, '') AS description
+       LIMIT 200`,
+    );
+
+    for (const e of entities) {
+      const text = `${e.type}: ${e.name}. ${e.description}`.substring(0, 8000);
+      try {
+        const embedding = await this.embedWithOpenAI(text);
+        this.documentVectors.set(e.uuid, {
+          uuid: e.uuid, type: e.type.toLowerCase(), text,
+          embedding, metadata: { name: e.name },
+        });
+      } catch (err: any) {
+        this.logger.warn(`Failed to embed ${e.uuid}: ${err.message}`);
+      }
+    }
+
+    this.logger.log(`OpenAI embedding index built: ${this.documentVectors.size} documents`);
+    return { indexed: this.documentVectors.size, model: 'text-embedding-3-small' };
+  }
+
+  /**
+   * 纯语义搜索 — 仅使用向量相似度（不混合图谱分数）
+   */
+  async semanticSearch(query: string, limit = 10): Promise<HybridSearchResult[]> {
+    if (this.documentVectors.size === 0) {
+      throw new Error('Vector index not built. Call buildIndex() or buildIndexWithOpenAI() first.');
+    }
+
+    this.vectorizer = new TfidfVectorizer();
+    const queryVec = this.vectorizer.transform(query);
+    const scores: Array<{ uuid: string; score: number; doc: VectorDocument }> = [];
+
+    for (const [uuid, doc] of this.documentVectors) {
+      const sim = this.vectorizer.cosineSimilarity(queryVec, doc.embedding);
+      if (sim > 0.05) scores.push({ uuid, score: sim, doc });
+    }
+
+    return scores
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit)
+      .map((s) => ({
+        uuid: s.uuid,
+        type: s.doc.type,
+        name: (s.doc.metadata?.name as string) || s.doc.text.substring(0, 50),
+        graphScore: 0,
+        vectorScore: s.score,
+        combinedScore: s.score,
+      }));
   }
 }

@@ -45,7 +45,7 @@ export class QualityService {
       this.countLowConfidence(),
     ]);
 
-    const completeness = this.calcCompleteness(totals);
+    const completeness = await this.calcCompleteness(totals);
     const evidenceCoverage = totals.relationships > 0
       ? 1 - missingEvidence / totals.relationships : 1;
     const freshness = 1 - expired / (totals.persons + totals.labs + 1);
@@ -158,13 +158,55 @@ export class QualityService {
     return r[0]?.c ?? 0;
   }
 
-  /** 完整性评分: 有 name + 有关系的比例 */
-  private calcCompleteness(totals: DQReport['totals']): number {
-    const total = totals.persons + totals.labs + totals.universities;
-    if (total === 0) return 0;
+  /** 完整性评分: 各实体类型必填字段填充率的加权平均 */
+  private async calcCompleteness(
+    totals: DQReport['totals'],
+  ): Promise<number> {
+    // 检查每个实体类型的核心字段填充情况
+    const checks = await Promise.all([
+      // Person: 检查 englishName/orcid/email
+      this.neo4j.read<{ c: number }>(
+        `MATCH (p:Person) WHERE p.englishName IS NOT NULL OR p.chineseName IS NOT NULL RETURN count(p) AS c`,
+      ),
+      // Lab: 检查 name/homepage
+      this.neo4j.read<{ c: number }>(
+        `MATCH (l:Lab) WHERE l.name IS NOT NULL AND l.homepage IS NOT NULL RETURN count(l) AS c`,
+      ),
+      // University: 检查 englishName/country
+      this.neo4j.read<{ c: number }>(
+        `MATCH (u:University) WHERE u.englishName IS NOT NULL AND u.country IS NOT NULL RETURN count(u) AS c`,
+      ),
+      // Paper: 检查 title/doi/year
+      this.neo4j.read<{ c: number }>(
+        `MATCH (p:Paper) WHERE p.title IS NOT NULL AND p.year IS NOT NULL RETURN count(p) AS c`,
+      ),
+      // Equipment: 检查 name/category
+      this.neo4j.read<{ c: number }>(
+        `MATCH (e:Equipment) WHERE e.name IS NOT NULL AND e.category IS NOT NULL RETURN count(e) AS c`,
+      ),
+      // Facility: 检查 name/country
+      this.neo4j.read<{ c: number }>(
+        `MATCH (f:Facility) WHERE f.name IS NOT NULL AND f.country IS NOT NULL RETURN count(f) AS c`,
+      ),
+      // Person with ORCID
+      this.neo4j.read<{ c: number }>(
+        `MATCH (p:Person) WHERE p.orcid IS NOT NULL RETURN count(p) AS c`,
+      ),
+    ]);
 
-    const missingFields = 0; // 简化：后续可扩展检查 chineseName/orcid/email 等
-    return Math.round((1 - missingFields / total) * 100) / 100;
+    const personComplete = totals.persons > 0 ? checks[0][0]?.c / totals.persons : 1;
+    const labComplete = totals.labs > 0 ? checks[1][0]?.c / totals.labs : 1;
+    const univComplete = totals.universities > 0 ? checks[2][0]?.c / totals.universities : 1;
+    const paperComplete = totals.papers > 0 ? checks[3][0]?.c / totals.papers : 1;
+    const equipComplete = totals.equipment > 0 ? checks[4][0]?.c / totals.equipment : 1;
+    const facComplete = totals.facilities > 0 ? checks[5][0]?.c / totals.facilities : 1;
+    const orcidCoverage = totals.persons > 0 ? checks[6][0]?.c / totals.persons : 0;
+
+    return Math.round(
+      (personComplete * 0.2 + labComplete * 0.15 + univComplete * 0.1 +
+       paperComplete * 0.2 + equipComplete * 0.1 + facComplete * 0.1 +
+       orcidCoverage * 0.15) * 100,
+    ) / 100;
   }
 
   /** 孤立节点清理建议 */

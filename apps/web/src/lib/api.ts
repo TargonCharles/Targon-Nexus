@@ -69,11 +69,21 @@ async function fetchApi<T>(path: string): Promise<ApiResponse<T>> {
 
 // -- API methods ------------------------------------------------------------
 
-export async function search(q: string, type?: string, page = 1, pageSize = 20) {
+export interface SearchOptions {
+  type?: string;
+  country?: string;
+  field?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export async function search(q: string, opts: SearchOptions = {}) {
   const params = new URLSearchParams({ q });
-  if (type) params.set('type', type);
-  params.set('page', String(page));
-  params.set('pageSize', String(pageSize));
+  if (opts.type) params.set('type', opts.type);
+  if (opts.country) params.set('country', opts.country);
+  if (opts.field) params.set('field', opts.field);
+  params.set('page', String(opts.page ?? 1));
+  params.set('pageSize', String(opts.pageSize ?? 20));
   return fetchApi<SearchResult[]>(`/search?${params}`);
 }
 

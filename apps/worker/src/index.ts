@@ -29,6 +29,34 @@ const deadLetterQueue = new Queue<DeadLetterJob>('dead-letter', { connection });
 
 const RUN_MODE = process.env.WORKER_RUN_MODE ?? 'live';
 
+// Singleton Neo4j driver — created once and reused across all validate jobs
+let _neo4jDriver: any = null;
+async function getNeo4jDriver(): Promise<any> {
+  if (_neo4jDriver) return _neo4jDriver;
+  const neo4j = await import('neo4j-driver');
+  const uri = process.env.NEO4J_URI ?? 'bolt://localhost:7687';
+  const user = process.env.NEO4J_USER ?? 'neo4j';
+  const password = process.env.NEO4J_PASSWORD ?? 'password';
+  _neo4jDriver = neo4j.driver(uri, neo4j.auth.basic(user, password), {
+    maxConnectionPoolSize: 5,
+  });
+  logger.info('Neo4j driver initialized (singleton)');
+  return _neo4jDriver;
+}
+
+/** 包装器：在 stub 模式下跳过实际执行，直接返回成功 */
+function withStubFallback<T extends JobResult>(
+  type: string,
+  job: Job,
+  stubResult: () => T,
+  realHandler: () => Promise<T>,
+): Promise<T> {
+  if (RUN_MODE === 'stub') {
+    return job.updateProgress(100).then(() => stubResult());
+  }
+  return realHandler();
+}
+
 async function handleCrawl(job: Job<CrawlJob>): Promise<JobResult> {
   logger.info({ jobId: job.id, seeds: job.data.seeds.length }, 'Processing crawl job');
   await job.updateProgress(10);
@@ -210,16 +238,9 @@ async function handleValidate(job: Job<ValidateJob>): Promise<JobResult> {
     'Processing validate job',
   );
 
-  // Validation runs directly against Neo4j
+  // Reuse singleton Neo4j driver instead of creating a new one per job
   try {
-    const neo4j = await import('neo4j-driver');
-    const uri = process.env.NEO4J_URI ?? 'bolt://localhost:7687';
-    const user = process.env.NEO4J_USER ?? 'neo4j';
-    const password = process.env.NEO4J_PASSWORD ?? 'password';
-    const driver = neo4j.driver(uri, neo4j.auth.basic(user, password), {
-      maxConnectionPoolSize: 5,
-    });
-
+    const driver = await getNeo4jDriver();
     const session = driver.session();
     const results: Record<string, { passed: boolean; issues: number; detail?: string }> = {};
 
@@ -272,7 +293,6 @@ async function handleValidate(job: Job<ValidateJob>): Promise<JobResult> {
       }
     } finally {
       await session.close();
-      await driver.close();
     }
 
     return {

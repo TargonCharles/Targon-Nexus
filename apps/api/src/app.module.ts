@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
-import { ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { CommonModule } from './common';
 import { AuthModule } from './auth';
 import { Neo4jModule } from './neo4j/neo4j.module';
 import { SearchModule } from './search/search.module';
@@ -29,6 +31,7 @@ import { IntegrationModule } from './integration/integration.module';
       },
     ]),
     AuthModule,
+    CommonModule,
     Neo4jModule,
     SearchModule,
     PersonModule,
@@ -42,6 +45,12 @@ import { IntegrationModule } from './integration/integration.module';
     VectorModule,
     QualityModule,
     IntegrationModule,
+  ],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
   ],
 })
 export class AppModule {}

@@ -3,9 +3,10 @@
 // 实体详情 / 关系图 / 搜索 / 引用网络
 // =============================================================================
 
-import { Resolver, Query, Args, ObjectType, Field, Int, Float, ID } from '@nestjs/graphql';
+import { Resolver, Query, Mutation, Args, ObjectType, Field, Int, Float, ID, InputType } from '@nestjs/graphql';
 import { Neo4jService } from '../neo4j/neo4j.service';
 import { SearchService } from '../search/search.service';
+import { generateUUID } from '@arp/shared';
 
 // — GraphQL Object Types —
 
@@ -75,6 +76,46 @@ class PaperDetail {
   @Field(() => [String], { nullable: true }) keywords?: string[];
 }
 
+// — Input Types —
+
+@InputType()
+class PersonInput {
+  @Field() englishName: string;
+  @Field({ nullable: true }) chineseName?: string;
+  @Field({ nullable: true }) orcid?: string;
+  @Field({ nullable: true }) email?: string;
+  @Field({ nullable: true }) homepage?: string;
+  @Field({ nullable: true }) biography?: string;
+  @Field(() => [String], { nullable: true }) researchInterests?: string[];
+}
+
+@InputType()
+class PaperInput {
+  @Field() title: string;
+  @Field() doi: string;
+  @Field(() => [String]) authors: string[];
+  @Field({ nullable: true }) journal?: string;
+  @Field(() => Int, { nullable: true }) year?: number;
+  @Field(() => [String], { nullable: true }) keywords?: string[];
+}
+
+@InputType()
+class RelationshipInput {
+  @Field() sourceUuid: string;
+  @Field() targetUuid: string;
+  @Field() type: string;
+  @Field(() => Float, { nullable: true }) confidence?: number;
+}
+
+// — Mutation response types —
+
+@ObjectType()
+class MutationResult {
+  @Field(() => ID) uuid: string;
+  @Field() success: boolean;
+  @Field({ nullable: true }) message?: string;
+}
+
 // — Resolver —
 
 @Resolver()
@@ -134,7 +175,8 @@ export class GraphQLResolver {
     @Args({ name: 'depth', type: () => Int, nullable: true }) depth?: number,
   ): Promise<GraphData> {
     const results = await this.neo4j.read<{
-      nodeUuid: string; nodeType: string; nodeLabel: string; nodeProps: string;
+      nodeUuid: string; nodeType: string; nodeLabel: string;
+      description: string; year: number; citationCount: number;
       edgeSource: string; edgeTarget: string; edgeType: string;
     }>(
       `MATCH (p:Paper {uuid: $uuid})
@@ -142,7 +184,7 @@ export class GraphQLResolver {
        WHERE labels(related)[0] IN ['Paper', 'Person']
        RETURN
          p.uuid AS nodeUuid, 'Paper' AS nodeType, p.title AS nodeLabel,
-         toString(properties(p)) AS nodeProps,
+         p.description AS description, p.year AS year, p.citationCount AS citationCount,
          null AS edgeSource, null AS edgeTarget, null AS edgeType
        UNION
        MATCH (p:Paper {uuid: $uuid})-[r:CITES|AUTHORED_BY]-(related)
@@ -150,7 +192,7 @@ export class GraphQLResolver {
        RETURN
          related.uuid AS nodeUuid, labels(related)[0] AS nodeType,
          coalesce(related.title, related.englishName, related.name) AS nodeLabel,
-         toString(properties(related)) AS nodeProps,
+         related.description AS description, related.year AS year, related.citationCount AS citationCount,
          startNode(r).uuid AS edgeSource,
          endNode(r).uuid AS edgeTarget,
          type(r) AS edgeType`,
@@ -162,15 +204,13 @@ export class GraphQLResolver {
 
     for (const row of results) {
       if (row.nodeUuid && !nodesMap.has(row.nodeUuid)) {
-        let props = {};
-        try { props = JSON.parse(row.nodeProps); } catch { /* ignore */ }
         nodesMap.set(row.nodeUuid, {
           uuid: row.nodeUuid,
           type: row.nodeType?.toLowerCase() || 'paper',
           label: row.nodeLabel || 'Unknown',
-          description: props['description'] || null,
-          year: props['year'] || null,
-          citationCount: props['citationCount'] || null,
+          description: row.description || null,
+          year: row.year || null,
+          citationCount: row.citationCount || null,
         });
       }
       if (row.edgeSource && row.edgeTarget) {
@@ -241,5 +281,68 @@ export class GraphQLResolver {
       nodes: Array.from(nodesMap.values()),
       edges: Array.from(edgesMap.values()),
     };
+  }
+
+  // — Mutations —
+
+  @Mutation(() => MutationResult)
+  async createPerson(@Args('input') input: PersonInput): Promise<MutationResult> {
+    const uuid = generateUUID();
+    await this.neo4j.write(
+      `CREATE (p:Person {uuid: $uuid}) SET p += $props, p.createdAt = datetime(), p.updatedAt = datetime() RETURN p`,
+      {
+        uuid,
+        props: {
+          englishName: input.englishName,
+          chineseName: input.chineseName ?? null,
+          orcid: input.orcid ?? null,
+          email: input.email ?? null,
+          homepage: input.homepage ?? null,
+          biography: input.biography ?? null,
+          researchInterests: input.researchInterests ?? [],
+          currentStatus: 'active',
+          confidence: 0.7,
+          source: 'graphql_manual',
+        },
+      },
+    );
+    return { uuid, success: true, message: 'Person created' };
+  }
+
+  @Mutation(() => MutationResult)
+  async createPaper(@Args('input') input: PaperInput): Promise<MutationResult> {
+    const uuid = generateUUID();
+    await this.neo4j.write(
+      `CREATE (p:Paper {uuid: $uuid}) SET p += $props, p.createdAt = datetime(), p.updatedAt = datetime() RETURN p`,
+      {
+        uuid,
+        props: {
+          title: input.title,
+          doi: input.doi,
+          authors: input.authors,
+          journal: input.journal ?? null,
+          year: input.year ?? null,
+          keywords: input.keywords ?? [],
+          citationCount: 0,
+          confidence: 0.7,
+          source: 'graphql_manual',
+        },
+      },
+    );
+    return { uuid, success: true, message: 'Paper created' };
+  }
+
+  @Mutation(() => MutationResult)
+  async addRelationship(@Args('input') input: RelationshipInput): Promise<MutationResult> {
+    const relType = input.type.replace(/[^a-zA-Z0-9_]/g, '_').toUpperCase();
+    await this.neo4j.write(
+      `MATCH (a {uuid: $src}) MATCH (b {uuid: $tgt})
+       MERGE (a)-[r:\`${relType}\`]->(b)
+       ON CREATE SET r.confidence = $conf, r.createdAt = datetime(), r.source = 'graphql_manual'
+       ON MATCH SET r.confidence = $conf, r.updatedAt = datetime()
+       RETURN type(r) AS t`,
+      { src: input.sourceUuid, tgt: input.targetUuid, conf: input.confidence ?? 0.7 },
+    );
+    return { uuid: input.sourceUuid, success: true, message: `Relationship ${relType} created` };
   }
 }

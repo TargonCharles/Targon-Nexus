@@ -216,8 +216,9 @@ export class EnrichService {
 
     for (const entity of entities) {
       let result: EnrichResult;
+      const normalizedType = entity.type.charAt(0).toUpperCase() + entity.type.slice(1).toLowerCase();
 
-      switch (entity.type) {
+      switch (normalizedType) {
         case 'Person':
           result = await this.enrichPerson(entity.uuid);
           break;
