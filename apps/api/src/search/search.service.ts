@@ -91,6 +91,8 @@ export class SearchService {
     opts: { type?: EntityType; country?: string; field?: string; page?: number; pageSize?: number } = {},
   ): Promise<SearchResponse> {
     const term = query.trim();
+    // Add wildcard suffix for stemming coverage (e.g. "superconductor" → matches "superconductors")
+    const searchTerm = term.endsWith('*') ? term : `${term}*`;
     const { page, pageSize, skip } = paginate(opts, 100);
 
     // Cache key for this search combination
@@ -102,7 +104,7 @@ export class SearchService {
     const types: EntityType[] = opts.type ? [opts.type] : ALL_TYPES;
 
     // Build optional filters with proper WHERE clause
-    const params: Record<string, unknown> = { term };
+    const params: Record<string, unknown> = { term: searchTerm };
     const conditions: string[] = [];
 
     if (opts.country) {
@@ -129,7 +131,7 @@ export class SearchService {
     const countQueries = types.map(async (type) => {
       const cypher = `CALL db.index.fulltext.queryNodes('${type}_fulltext', $term) YIELD node RETURN count(node) AS total`;
       try {
-        const r = await this.neo4j.read<{ total: number }>(cypher, { term });
+        const r = await this.neo4j.read<{ total: number }>(cypher, { term: searchTerm });
         return r[0]?.total ?? 0;
       } catch { return 0; }
     });
@@ -145,7 +147,7 @@ export class SearchService {
     const items = allItems.slice(skip, skip + pageSize);
 
     // Facets — reuse counts from search to avoid duplicate fulltext queries
-    const facets = await this.computeFacets(term, types, counts);
+    const facets = await this.computeFacets(searchTerm, types, counts);
 
     const response = { items, total, facets };
     this.cache.set(cacheKey, response, 120_000); // 2 min TTL
