@@ -108,11 +108,23 @@ export class SearchService {
     const conditions: string[] = [];
 
     if (opts.country) {
-      conditions.push('(node.country = $country OR (node)-[:BELONGS_TO]->(:University {country: $country}))');
+      // 不同实体类型到达国家的路径不同: Lab→BELONGS_TO, Person→AFFILIATED_WITH,
+      // Person→MEMBER_OF→Lab→BELONGS_TO→University
+      conditions.push(
+        `(node.country = $country ` +
+        `OR (node)-[:BELONGS_TO]->(:University {country: $country}) ` +
+        `OR (node)-[:AFFILIATED_WITH]->(:University {country: $country}) ` +
+        `OR (node)-[:MEMBER_OF]->(:Lab)-[:BELONGS_TO]->(:University {country: $country}))`
+      );
       params.country = opts.country;
     }
     if (opts.field) {
-      conditions.push('(node.field = $field OR (node)-[:RESEARCHES_ON]->(:ResearchDirection {name: $field}))');
+      // 不同实体到研究方向的路径不同: Lab→RESEARCHES_ON, Person→MEMBER_OF→Lab→RESEARCHES_ON
+      conditions.push(
+        `(node.field = $field ` +
+        `OR (node)-[:RESEARCHES_ON]->(:ResearchDirection {name: $field}) ` +
+        `OR (node)-[:MEMBER_OF]->(:Lab)-[:RESEARCHES_ON]->(:ResearchDirection {name: $field}))`
+      );
       params.field = opts.field;
     }
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')} ` : '';
