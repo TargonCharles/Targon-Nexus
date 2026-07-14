@@ -56,7 +56,7 @@ export class EvidenceService {
     return uuid;
   }
 
-  /** 将证据绑定到关系 */
+  /** 将证据绑定到关系两端节点 + 标记关系本身 */
   async linkEvidenceToRelationship(params: {
     evidenceUuid: string;
     sourceUuid: string;
@@ -68,10 +68,14 @@ export class EvidenceService {
       throw new BadRequestException(`Invalid relationship type: ${params.relationshipType}`);
     }
 
+    // Neo4j 5 不支持关系→节点的 MERGE，改为：
+    // 1. 将 Evidence 链接到参与关系的两个节点
+    // 2. 在关系属性上设置 evidenceUrl 作为标记
     await this.neo4j.write(
       `MATCH (e:Evidence {uuid: $evUuid})
        MATCH (a {uuid: $srcUuid})-[r:${params.relationshipType}]->(b {uuid: $tgtUuid})
-       MERGE (r)-[:HAS_EVIDENCE]->(e)
+       MERGE (a)-[:SOURCED_FROM]->(e)
+       MERGE (b)-[:SOURCED_FROM]->(e)
        SET r.evidenceUrl = coalesce(r.evidenceUrl, e.sourceUrl),
            r.verifiedAt = datetime()
        RETURN type(r)`,

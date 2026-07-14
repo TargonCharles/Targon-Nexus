@@ -1,6 +1,7 @@
 import { Module, Global } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { AuthController } from './auth.controller';
 
 /**
  * Global authentication module.
@@ -11,6 +12,7 @@ import { JwtAuthGuard } from './jwt-auth.guard';
  */
 @Global()
 @Module({
+  controllers: [AuthController],
   providers: [
     {
       provide: APP_GUARD,

@@ -1,0 +1,96 @@
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
+
+type EntityEdge {
+  confidence: Float
+  label: String!
+  source: String!
+  target: String!
+  type: String!
+}
+
+type EntityNode {
+  citationCount: Int
+  degree: Int
+  description: String
+  label: String!
+  type: String!
+  uuid: ID!
+  year: Int
+}
+
+type GraphData {
+  edges: [EntityEdge!]!
+  nodes: [EntityNode!]!
+}
+
+type Mutation {
+  addRelationship(input: RelationshipInput!): MutationResult!
+  createPaper(input: PaperInput!): MutationResult!
+  createPerson(input: PersonInput!): MutationResult!
+}
+
+type MutationResult {
+  message: String
+  success: Boolean!
+  uuid: ID!
+}
+
+input PaperInput {
+  authors: [String!]!
+  doi: String!
+  journal: String
+  keywords: [String!]
+  title: String!
+  year: Int
+}
+
+type PersonDetail {
+  biography: String
+  chineseName: String
+  currentStatus: String
+  email: String
+  englishName: String
+  homepage: String
+  orcid: String
+  researchInterests: [String!]
+  uuid: ID!
+}
+
+input PersonInput {
+  biography: String
+  chineseName: String
+  email: String
+  englishName: String!
+  homepage: String
+  orcid: String
+  researchInterests: [String!]
+}
+
+type Query {
+  citationGraph(depth: Int, paperUuid: String!): GraphData!
+  entityGraph(uuid: String!): GraphData!
+  person(uuid: String!): PersonDetail
+  search(page: Int, pageSize: Int, query: String!, type: String): SearchResponse!
+}
+
+input RelationshipInput {
+  confidence: Float
+  sourceUuid: String!
+  targetUuid: String!
+  type: String!
+}
+
+type SearchResponse {
+  items: [SearchResult!]!
+  total: Int!
+}
+
+type SearchResult {
+  name: String!
+  score: Float
+  subtitle: String
+  type: String!
+  uuid: ID!
+}
