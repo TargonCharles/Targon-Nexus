@@ -45,13 +45,16 @@ export default function GraphCanvas({ data, height = 500, personOnly, onNodeClic
     svg.style.background = '#f8fafc';
     container.appendChild(svg);
 
+    // Deduplicate nodes by UUID
+    const deduped = Array.from(new Map(data.nodes.map((n) => [n.uuid, n])).values());
+
     // Count by type
     const counts: Record<string, number> = {};
-    data.nodes.forEach((n) => { counts[n.type] = (counts[n.type] || 0) + 1; });
+    deduped.forEach((n) => { counts[n.type] = (counts[n.type] || 0) + 1; });
     setStats(counts);
 
     // Filter nodes — personOnly mode shows only Person type
-    let activeNodes = data.nodes;
+    let activeNodes = deduped;
     if (personOnly) {
       activeNodes = data.nodes.filter((n) => n.type === 'Person');
     } else if (filters.size > 0) {

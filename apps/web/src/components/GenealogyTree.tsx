@@ -15,8 +15,13 @@ export default function GenealogyTree({ data, egoName, onNodeClick }: Props) {
     const svg = svgRef.current;
     svg.innerHTML = '';
 
+    // Deduplicate nodes by UUID before rendering
+    const dedupedNodes = Array.from(
+      new Map(data.nodes.map((n) => [n.uuid, n])).values()
+    );
+
     // Index — prefer Chinese name
-    const nameMap = new Map(data.nodes.map((n) => [n.uuid, (n as any).chineseName || n.name || n.uuid]));
+    const nameMap = new Map(dedupedNodes.map((n) => [n.uuid, (n as any).chineseName || n.name || n.uuid]));
     const advisors = new Map<string, string[]>();  // child → [advisor]
     const students = new Map<string, string[]>();   // advisor → [students]
     const peers = new Map<string, string[]>();       // person → [coauthors]
@@ -40,8 +45,8 @@ export default function GenealogyTree({ data, egoName, onNodeClick }: Props) {
       }
     });
 
-    const ego = data.nodes.find((n) => n.name === egoName || n.uuid.includes(egoName.toLowerCase().replace(/\s+/g, '-')));
-    const egoUuid = ego?.uuid ?? data.nodes[0]?.uuid;
+    const ego = dedupedNodes.find((n) => n.name === egoName || n.uuid.includes(egoName.toLowerCase().replace(/\s+/g, '-')));
+    const egoUuid = ego?.uuid ?? dedupedNodes[0]?.uuid;
     const egoN = nameMap.get(egoUuid) || egoUuid;
 
     // Collect all tree nodes with (level, column)
