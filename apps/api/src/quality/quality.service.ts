@@ -131,7 +131,6 @@ export class QualityService {
     const r = await this.neo4j.read<{ c: number }>(
       `MATCH ()-[r]->()
        WHERE r.evidenceUrl IS NULL
-         AND NOT EXISTS { (r)-[:HAS_EVIDENCE]->(:Evidence) }
        RETURN count(r) AS c`,
     );
     return r[0]?.c ?? 0;

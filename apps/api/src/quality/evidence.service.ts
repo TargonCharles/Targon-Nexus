@@ -147,7 +147,8 @@ export class EvidenceService {
     const [total, withEv] = await Promise.all([
       this.neo4j.read<{ c: number }>('MATCH ()-[r]->() RETURN count(r) AS c'),
       this.neo4j.read<{ c: number }>(
-        `MATCH ()-[r]->() WHERE r.evidenceUrl IS NOT NULL OR EXISTS { (r)-[:HAS_EVIDENCE]->(:Evidence) }
+        `MATCH ()-[r]->()
+         WHERE r.evidenceUrl IS NOT NULL
          RETURN count(r) AS c`,
       ),
     ]);
