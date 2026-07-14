@@ -1,0 +1,55 @@
+{
+  "name": "@arp/sdk",
+  "version": "0.1.0",
+  "description": "JavaScript / TypeScript SDK for the Targon Nexus (Targon Nexus) API. Provides typed methods for entity search, knowledge-graph traversal, and person / lab / equipment / paper CRUD operations.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "dev": "tsc --watch --preserveWatchOutput",
+    "build": "tsc",
+    "lint": "eslint src/ --ext .ts --max-warnings 0",
+    "clean": "rimraf dist",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@arp/types": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.12",
+    "eslint": "^9.7.0",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.5.4"
+  },
+  "peerDependencies": {
+    "axios": "^1.7.0"
+  },
+  "peerDependenciesMeta": {
+    "axios": {
+      "optional": false
+    }
+  },
+  "keywords": [
+    "arp",
+    "arpes",
+    "sdk",
+    "api-client",
+    "knowledge-graph",
+    "academic-research",
+    "typescript"
+  ],
+  "license": "MIT"
+}

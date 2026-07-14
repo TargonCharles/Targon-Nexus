@@ -1,0 +1,45 @@
+{
+  "name": "@arp/prompts",
+  "version": "0.1.0",
+  "description": "Version-controlled LLM prompt templates for entity extraction, relationship inference, identity resolution, and entity validation within the ARPES academic knowledge graph platform.",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "lint": "eslint src/ --ext .ts --max-warnings 0",
+    "validate": "node ./dist/validate.js",
+    "clean": "rimraf dist",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@arp/types": "workspace:*"
+  },
+  "devDependencies": {
+    "eslint": "^9.7.0",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.5.4"
+  },
+  "keywords": [
+    "arp",
+    "arpes",
+    "llm-prompts",
+    "entity-extraction",
+    "knowledge-graph",
+    "academic-research",
+    "prompt-engineering"
+  ],
+  "license": "MIT"
+}

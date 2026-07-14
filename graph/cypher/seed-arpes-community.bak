@@ -1,0 +1,10 @@
+MATCH (p:Person {uuid:'person-zx-shen'}) SET p.photoUrl='https://physics.stanford.edu/sites/default/files/styles/medium/public/zxs.jpg', p.title='Paul Pigott Professor', p.bio='沈志勋，斯坦福大学教授。1983年复旦大学本科，1989年斯坦福大学博士（导师Robert Laughlin）。美国国家科学院院士。', p.education='复旦大学本科(1983); 斯坦福大学博士(1989)', p.timeline='1989-1991:斯坦福博士后; 1991:斯坦福助理教授; 2000:斯坦福正教授; 2015:美国科学院院士' RETURN p.englishName;
+MATCH (p:Person {uuid:'person-feng-dl'}) SET p.title='教授、杰青', p.bio='封东来，复旦大学教授。中国科大本科，斯坦福大学博士（导师沈志勋）。铁基超导体ARPES研究。', p.education='中国科学技术大学本科; 斯坦福大学博士', p.timeline='2005:复旦大学副教授; 2010:复旦大学教授; 2012:国家杰青' RETURN p.englishName;
+MATCH (p:Person {uuid:'person-zhou-xj'}) SET p.title='研究员、杰青', p.bio='周兴江，中科院物理所研究员，超导国家重点实验室主任。高温铜基超导ARPES。', p.education='中国科学技术大学本科; 中科院物理所博士', p.timeline='2000-2005:斯坦福大学博士后; 2005:中科院物理所研究员; 2015:超导实验室主任' RETURN p.englishName;
+MATCH (p:Person {uuid:'person-wang-sc'}) SET p.title='教授', p.bio='王善才，中国人民大学教授。铁基超导体ARPES与STM研究。', p.timeline='2010:中国人民大学副教授; 2015:中国人民大学教授' RETURN p.englishName;
+MATCH (p:Person {uuid:'person-damascelli'}) SET p.title='Professor, QMI Director', p.bio='Andrea Damascelli, UBC教授、量子物质研究所主任。激光ARPES先驱。斯坦福博士后（沈志勋组）。', p.timeline='2001-2003:斯坦福博士后; 2003:UBC教授; 2015:QMI主任' RETURN p.englishName;
+MATCH (p:Person {uuid:'person-lanzara'}) SET p.title='Professor', p.bio='Alessandra Lanzara, UC Berkeley教授。时间分辨ARPES（trARPES）先驱。', p.timeline='2002:UC Berkeley助理教授; 2014:UC Berkeley教授' RETURN p.englishName;
+MATCH (p:Person {uuid:'person-ychen'}) SET p.title='Professor', p.bio='陈宇林，牛津大学教授。拓扑量子材料ARPES研究。', p.timeline='2008:牛津大学讲师; 2013:牛津大学教授' RETURN p.englishName;
+MATCH (p:Person {uuid:'person-kondo'}) SET p.title='Associate Professor', p.bio='Takeshi Kondo，东京大学物性研究所副教授。激光ARPES研究高温超导。', p.timeline='2010:东京大学助理教授; 2015:东京大学副教授' RETURN p.englishName;
+MATCH (p:Person {uuid:'person-ding-h'}) SET p.title='研究员、杰青', p.bio='丁洪，中科院物理所研究员。铁基超导体ARPES研究。', p.timeline='2008:中科院物理所研究员' RETURN p.englishName;
+RETURN 'Done' AS result;

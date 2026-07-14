@@ -1,0 +1,21 @@
+{
+  "name": "@arp/agent-runtime",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Targon Nexus V1.5 — Multi-Agent Runtime with Event Bus and Orchestrator",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@arp/types": "workspace:*",
+    "@arp/shared": "workspace:*",
+    "@arp/prompts": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0",
+    "@types/node": "^20.10.0"
+  }
+}

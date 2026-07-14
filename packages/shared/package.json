@@ -1,0 +1,57 @@
+{
+  "name": "@arp/shared",
+  "version": "0.1.0",
+  "description": "Shared pure-utility functions for the Targon Nexus — zero runtime dependencies. Includes UUID generation, date formatting, confidence calculation, URL validation, Chinese/English/pinyin name normalization, and alias matching.",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs",
+      "types": "./dist/index.d.ts"
+    },
+    "./uuid": "./dist/uuid.js",
+    "./name": "./dist/name.js",
+    "./date": "./dist/date.js",
+    "./url": "./dist/url.js",
+    "./confidence": "./dist/confidence.js",
+    "./evidence": "./dist/evidence.js"
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "dev": "tsc --watch --preserveWatchOutput",
+    "build": "tsc",
+    "lint": "eslint src/ --ext .ts --max-warnings 0",
+    "test": "vitest run --coverage",
+    "test:watch": "vitest",
+    "clean": "rimraf dist",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "@types/uuid": "^9.0.0",
+    "eslint": "^9.7.0",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.5.4",
+    "vitest": "^2.0.3",
+    "@vitest/coverage-v8": "^2.0.3"
+  },
+  "keywords": [
+    "arp",
+    "arpes",
+    "uuid",
+    "name-normalization",
+    "pinyin",
+    "confidence-scoring",
+    "evidence-validation"
+  ],
+  "license": "MIT",
+  "sideEffects": false
+}

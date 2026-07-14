@@ -1,0 +1,228 @@
+﻿version: "3.9"
+
+# =============================================================================
+# ARP (Targon Nexus) — Development Docker Compose
+# =============================================================================
+# Services: Neo4j (graph DB), PostgreSQL (relational DB), Redis (cache/queue),
+#           NestJS API, Next.js Web, Playwright Crawler
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # Neo4j — Knowledge Graph Database
+  # ---------------------------------------------------------------------------
+  neo4j:
+    image: neo4j:5-community
+    container_name: arp-neo4j
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:7474:7474"   # HTTP / Neo4j Browser (localhost only)
+      - "127.0.0.1:7687:7687"   # Bolt protocol (localhost only)
+    environment:
+      NEO4J_AUTH: "${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD:-password}"
+      NEO4J_dbms_memory_heap_initial__size: "512m"
+      NEO4J_dbms_memory_heap_max__size: "2g"
+      NEO4J_dbms_memory_pagecache_size: "1g"
+      # Whitelist-only: only safe APOC procedures. Excluded dangerous namespaces:
+      # apoc.load.* (file-read), apoc.export.* (file-write), apoc.convert.* (RCE vector),
+      # apoc.trigger.*, apoc.custom.*, apoc.system.*
+      NEO4J_dbms_security_procedures_unrestricted: "apoc.text.*,apoc.map.*,apoc.coll.*,apoc.date.*,apoc.math.*,apoc.schema.*,apoc.periodic.*,gds.*"
+      NEO4J_PLUGINS: '["apoc", "graph-data-science"]'
+      NEO4J_dbms_connector_bolt_advertised__address: "localhost:7687"
+      NEO4J_dbms_connector_http_advertised__address: "localhost:7474"
+    volumes:
+      - neo4j-data:/data
+      - neo4j-logs:/logs
+      - neo4j-import:/var/lib/neo4j/import
+      - ./neo4j/conf:/conf
+    networks:
+      - arp-network
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u ${NEO4J_USER:-neo4j} -p ${NEO4J_PASSWORD:-password} 'RETURN 1' || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL — Relational Database (users, papers metadata, analytics)
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: arp-postgres
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5432:5432"
+    environment:
+      POSTGRES_USER: "${POSTGRES_USER:-arp}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-password}"
+      POSTGRES_DB: "${POSTGRES_DB:-arp}"
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d
+    networks:
+      - arp-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-arp} -d ${POSTGRES_DB:-arp}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # ---------------------------------------------------------------------------
+  # Redis — Cache & Message Queue (BullMQ)
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: arp-redis
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6379:6379"
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --requirepass "${REDIS_PASSWORD:-redispass}"
+    volumes:
+      - redis-data:/data
+    networks:
+      - arp-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # API — NestJS Backend
+  # ---------------------------------------------------------------------------
+  api:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.api
+      target: development
+    container_name: arp-api
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: development
+      NEO4J_URI: "${NEO4J_URI:-bolt://neo4j:7687}"
+      NEO4J_USER: "${NEO4J_USER:-neo4j}"
+      NEO4J_PASSWORD: "${NEO4J_PASSWORD:-password}"
+      DATABASE_URL: "${DATABASE_URL:-postgresql://arp:password@postgres:5432/arp}"
+      REDIS_URL: "${REDIS_URL:-redis://:redispass@redis:6379}"
+      LLM_API_KEY: "${LLM_API_KEY:-}"
+      LLM_BASE_URL: "${LLM_BASE_URL:-https://api.openai.com/v1}"
+      LLM_MODEL: "${LLM_MODEL:-gpt-4o}"
+      LOG_LEVEL: "${LOG_LEVEL:-debug}"
+      API_PORT: "3001"
+    volumes:
+      - ../apps/api/src:/app/src
+      - ../packages:/app/packages
+    depends_on:
+      neo4j:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - arp-network
+
+  # ---------------------------------------------------------------------------
+  # Web — Next.js Frontend
+  # ---------------------------------------------------------------------------
+  web:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.web
+      target: development
+    container_name: arp-web
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      NEXT_PUBLIC_API_URL: "${NEXT_PUBLIC_API_URL:-http://localhost:3001}"
+      NEXT_PUBLIC_NEO4J_URI: "${NEXT_PUBLIC_NEO4J_URI:-bolt://localhost:7687}"
+      API_INTERNAL_URL: "http://api:3001"
+      REDIS_URL: "${REDIS_URL:-redis://:redispass@redis:6379}"
+    volumes:
+      - ../apps/web:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - api
+    networks:
+      - arp-network
+
+  # ---------------------------------------------------------------------------
+  # Crawler — Playwright-based Web Scraper (runs periodically)
+  # ---------------------------------------------------------------------------
+  crawler:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.crawler
+    container_name: TargonNexus-Crawler
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: "${DATABASE_URL:-postgresql://arp:password@postgres:5432/arp}"
+      REDIS_URL: "${REDIS_URL:-redis://:redispass@redis:6379}"
+      CRAWLER_CONCURRENCY: "${CRAWLER_CONCURRENCY:-3}"
+      CRAWLER_HEADFUL: "${CRAWLER_HEADFUL:-false}"
+      LOG_LEVEL: "${LOG_LEVEL:-debug}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - arp-network
+    profiles:
+      - crawler   # Start with: docker compose --profile crawler up -d
+
+  # ---------------------------------------------------------------------------
+  # Nginx — Reverse Proxy (optional, for production-like dev)
+  # ---------------------------------------------------------------------------
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: arp-nginx
+    restart: unless-stopped
+    ports:
+      - "${NGINX_PORT:-8080}:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - web
+      - api
+    networks:
+      - arp-network
+    profiles:
+      - proxy    # Start with: docker compose --profile proxy up -d
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  arp-network:
+    name: arp-network
+    driver: bridge
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  neo4j-data:
+    name: arp-neo4j-data
+  neo4j-logs:
+    name: arp-neo4j-logs
+  neo4j-import:
+    name: arp-neo4j-import
+  postgres-data:
+    name: arp-postgres-data
+  redis-data:
+    name: arp-redis-data

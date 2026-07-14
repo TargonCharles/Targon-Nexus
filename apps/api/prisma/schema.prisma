@@ -1,0 +1,40 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model SyncHistory {
+  id            String   @id @default(uuid())
+  syncType      String
+  status        String   @default("started")
+  startedAt     DateTime @default(now())
+  completedAt   DateTime?
+  nodesCreated  Int      @default(0)
+  nodesUpdated  Int      @default(0)
+  relationships Int      @default(0)
+  issues        Int      @default(0)
+  report        String?
+  createdAt     DateTime @default(now())
+
+  @@index([startedAt])
+  @@index([status])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  entityType String
+  entityId   String
+  action     String
+  operator   String   @default("system")
+  reason      String?
+  before     String?
+  after      String?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}

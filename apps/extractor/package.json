@@ -1,0 +1,26 @@
+{
+  "name": "@arp/extractor",
+  "version": "0.1.0",
+  "description": "Targon Nexus Extractor — LLM-powered entity & relationship extraction from structured academic documents",
+  "private": true,
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "lint": "eslint \"src/**/*.ts\" --fix"
+  },
+  "dependencies": {
+    "@arp/prompts": "workspace:*",
+    "@arp/shared": "workspace:*",
+    "@arp/types": "workspace:*",
+    "bullmq": "^5.1.0",
+    "ioredis": "^5.3.2",
+    "openai": "^4.26.0"
+  },
+  "devDependencies": {
+    "@arp/eslint-config": "workspace:*",
+    "@types/node": "^20.10.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  }
+}

@@ -1,0 +1,354 @@
+﻿# =============================================================================
+# QA Agent — Quality Assurance & Graph Validation
+# =============================================================================
+# Part of the Targon Nexus (Targon Nexus) agent fabric.
+# Stateless, event-driven agent communicating exclusively through the Event Bus.
+# =============================================================================
+
+agent:
+  name: qa-agent
+  version: "1.0.0"
+  description: >
+    Quality assurance agent for continuous graph validation and health
+    monitoring. Detects orphan nodes, circular relationships, missing evidence,
+    time conflicts, data anomalies, and generates daily/weekly quality reports
+    with coverage statistics and trend analysis.
+
+  kind: stateless-event-driven
+
+# ---------------------------------------------------------------------------
+# Event Bus Interface
+# ---------------------------------------------------------------------------
+events:
+  triggers:
+    - GraphEvent:
+        description: >
+          Triggered by every graph write batch. The QA agent runs lightweight,
+          incremental checks on the affected subgraph to catch issues early.
+        schema: events/graph_event.json
+        handler: handle_graph_event
+        filter:
+          severity: ["warning", "critical"]
+
+    - GraphIntegrityIssue:
+        description: >
+          Issues detected inline by the graph-agent during writes. The QA agent
+          aggregates, deduplicates, and enriches these into actionable reports.
+        schema: events/graph_integrity_issue.json
+        handler: handle_integrity_issue
+
+    - ValidationTrigger:
+        description: >
+          Explicit validation request from the updater-agent after a sync
+          cycle or from the API layer for targeted validation.
+        schema: events/validation_trigger.json
+        handler: handle_validation_trigger
+
+    - CronEvent:
+        description: >
+          Scheduled trigger for daily and weekly quality reports.
+        schema: events/cron_event.json
+        handler: handle_cron
+        filter:
+          cron_type: ["daily-report", "weekly-report"]
+
+  actions:
+    - detect_orphan_nodes:
+        description: >
+          Find all nodes (by type) that have zero relationships. Source nodes
+          are excluded — they are expected to sometimes be standalone.
+          Outputs a severity rating and suggested remediation.
+        input:
+          node_types: [string]       # Types to check, or ALL
+          min_age_hours: integer     # Only flag nodes older than this
+        output:
+          orphan_count: integer
+          orphans: [dict]
+          severity: "info | warning | critical"
+
+    - detect_circular_advisorship:
+        description: >
+          Traverse ADVISED_BY relationships to detect cycles. A cycle in
+          advisory relationships (A advised B, B advised C, C advised A)
+          is almost certainly a data error.
+        input:
+          max_cycle_length: integer  # Default 5
+        output:
+          cycles_found: integer
+          cycles: [dict]
+          severity: "warning"
+
+    - detect_missing_evidence:
+        description: >
+          Scan all relationships for missing mandatory evidence properties:
+          evidence_type, source_url, and confidence. Relationships without
+          these are integrity violations.
+        input:
+          relationship_types: [string]
+        output:
+          missing_count: integer
+          violations: [dict]
+          severity: "critical"
+
+    - detect_timeline_conflicts:
+        description: >
+          Check timeline events for temporal inconsistencies: events out
+          of order, overlapping affiliations, impossible career timelines
+          (e.g., graduated before born), publication dates before author's
+          birth year.
+        input:
+          entity_types: [string]
+        output:
+          conflicts_found: integer
+          conflicts: [dict]
+          severity: "warning | critical"
+
+    - detect_duplicate_relationships:
+        description: >
+          Find duplicate relationships (same type, same endpoints, same
+          evidence). MERGE should prevent this, but bugs happen.
+        input:
+          relationship_types: [string]
+        output:
+          duplicates_found: integer
+          duplicates: [dict]
+          severity: "warning"
+
+    - check_confidence_thresholds:
+        description: >
+          Identify entities and relationships with confidence below
+          acceptable thresholds. Flag those that should be reviewed.
+        input:
+          entity_types: [string]
+          min_confidence: float      # Default 0.60
+        output:
+          low_confidence_count: integer
+          entities: [dict]
+          severity: "info | warning"
+
+    - verify_source_provenance:
+        description: >
+          Ensure every entity (except Source itself) has at least one
+          SOURCED_FROM relationship. Entities without provenance are
+          unverifiable and must be flagged.
+        input:
+          entity_types: [string]
+        output:
+          missing_provenance_count: integer
+          entities: [dict]
+          severity: "warning"
+
+    - compute_coverage_statistics:
+        description: >
+          Calculate coverage metrics: what percentage of known ARPES
+          researchers are in the graph, what percentage of arXiv preprints
+          in relevant categories are indexed, what percentage of known
+          facilities have full beamline data, etc.
+        input:
+          scope: string
+        output:
+          coverage: dict
+          gaps: [dict]
+
+    - generate_daily_report:
+        description: >
+          Produce a comprehensive daily quality report with all metrics,
+          trends, issues, and recommendations.
+        input:
+          date: string
+        output:
+          report: dict               # Full structured report
+          report_markdown: string    # Human-readable markdown
+
+    - generate_weekly_report:
+        description: >
+          Produce a weekly quality report with trend analysis comparing
+          current week metrics to the previous week.
+        input:
+          week_start: string
+        output:
+          report: dict
+
+    - track_issue_resolution:
+        description: >
+          Compare current issues with the previous report to determine
+          which issues were resolved, which are new, and which are persisting.
+        input:
+          previous_report_id: string
+          current_issues: [dict]
+        output:
+          resolved: integer
+          new_issues: integer
+          persisting: integer
+          resolution_rate: float
+
+  emits:
+    - ValidationReport:
+        description: >
+          The primary output — a structured validation report with all
+          findings, metrics, and recommendations.
+        schema: events/validation_report.json
+
+    - ValidationIssue:
+        description: >
+          Emitted for each individual issue found. Downstream consumers
+          (dashboard, alerting) can subscribe for real-time notifications.
+        schema: events/validation_issue.json
+
+    - QualityMetrics:
+        description: >
+          Periodic emission of key quality metrics for dashboarding and
+          monitoring (Prometheus/Grafana compatible).
+        schema: events/quality_metrics.json
+
+# ---------------------------------------------------------------------------
+# Validation Checks Registry
+# ---------------------------------------------------------------------------
+checks:
+  orphan_detection:
+    severity: "warning"
+    schedule: "on_graph_event"
+    exclude_types: ["Source", "TimelineEvent"]
+    min_node_age_hours: 24
+
+  circular_advisorship:
+    severity: "warning"
+    schedule: "weekly"
+    max_cycle_length: 10
+
+  missing_evidence:
+    severity: "critical"
+    schedule: "on_graph_event"
+    required_properties: ["evidence_type", "source_url", "confidence"]
+
+  timeline_conflicts:
+    severity: "warning"
+    schedule: "daily"
+    checks:
+      - "event_order_consistency"
+      - "overlapping_affiliations"
+      - "career_impossibilities"
+      - "publication_before_birth"
+
+  duplicate_relationships:
+    severity: "warning"
+    schedule: "on_graph_event"
+
+  low_confidence:
+    severity: "info"
+    schedule: "daily"
+    thresholds:
+      entity_confidence_min: 0.60
+      relationship_confidence_min: 0.50
+
+  source_provenance:
+    severity: "warning"
+    schedule: "daily"
+    exclude_types: ["Source"]
+
+  coverage:
+    schedule: "weekly"
+    metrics:
+      - "researcher_coverage_pct"
+      - "institution_coverage_pct"
+      - "facility_coverage_pct"
+      - "publication_coverage_pct"
+      - "arpes_subfield_coverage_pct"
+
+  graph_health:
+    schedule: "daily"
+    metrics:
+      - "total_nodes"
+      - "total_relationships"
+      - "graph_density"
+      - "orphan_rate"
+      - "avg_confidence"
+      - "entities_per_source"
+
+# ---------------------------------------------------------------------------
+# Reporting Configuration
+# ---------------------------------------------------------------------------
+reporting:
+  daily_report:
+    enabled: true
+    schedule: "0 6 * * *"              # 6:00 AM daily
+    include_sections:
+      - "executive_summary"
+      - "issues_summary"
+      - "new_issues_detail"
+      - "resolved_issues"
+      - "quality_metrics"
+      - "coverage_stats"
+      - "low_confidence_entities"
+      - "recommendations"
+
+  weekly_report:
+    enabled: true
+    schedule: "0 7 * * 1"              # 7:00 AM Monday
+    include_sections:
+      - "executive_summary"
+      - "week_over_week_trends"
+      - "issues_summary"
+      - "persistent_issues"            # Open > 7 days
+      - "coverage_trends"
+      - "graph_growth_stats"
+      - "top_contributors"
+      - "recommendations"
+
+  alerting:
+    enabled: true
+    critical_issues:
+      - "missing_evidence_count > 10"
+      - "orphan_count_increase > 20%"
+      - "graph_write_failure_rate > 5%"
+    warning_issues:
+      - "orphan_count > 50"
+      - "low_confidence_entity_count > 100"
+      - "circular_advisorship_detected"
+
+# ---------------------------------------------------------------------------
+# Quality Thresholds
+# ---------------------------------------------------------------------------
+thresholds:
+  orphan_max: 50                       # Max acceptable orphan count
+  orphan_rate_max_pct: 1.0             # Max % of nodes that are orphans
+  missing_evidence_max: 0              # Must be zero — hard requirement
+  low_confidence_max_pct: 5.0          # Max % of entities with confidence < 0.60
+  source_provenance_min_pct: 99.0      # Min % of entities with SOURCED_FROM
+  duplicate_relationship_max: 0        # Must be zero
+  coverage_min_pct: 80.0               # Minimum acceptable coverage
+  avg_confidence_min: 0.85             # Graph-wide average confidence floor
+
+# ---------------------------------------------------------------------------
+# Resources & Limits
+# ---------------------------------------------------------------------------
+resources:
+  cpu_limit: "2.0"
+  memory_limit_mb: 2048
+  disk_limit_gb: 10
+
+# ---------------------------------------------------------------------------
+# Observability
+# ---------------------------------------------------------------------------
+observability:
+  metrics:
+    - validation_runs_total
+    - issues_detected_total
+    - issues_resolved_total
+    - issues_persisting_total
+    - orphan_nodes_current
+    - missing_evidence_current
+    - circular_advisorship_current
+    - low_confidence_entities_current
+    - coverage_pct
+    - graph_density
+    - avg_confidence
+    - validation_duration_seconds
+    - daily_reports_generated_total
+    - weekly_reports_generated_total
+  logging:
+    level: info
+    structured: true
+  tracing:
+    enabled: true
+    propagate_context: true

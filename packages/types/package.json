@@ -1,0 +1,42 @@
+{
+  "name": "@arp/types",
+  "version": "0.1.0",
+  "description": "Shared TypeScript type definitions for the Targon Nexus (Targon Nexus) — domain entities, API contracts, agent events, and enumerations. Zero runtime dependencies.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "lint": "eslint src/ --ext .ts --max-warnings 0",
+    "clean": "rimraf dist",
+    "prepublishOnly": "npm run build"
+  },
+  "devDependencies": {
+    "eslint": "^9.7.0",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.5.4"
+  },
+  "keywords": [
+    "arp",
+    "arpes",
+    "types",
+    "type-definitions",
+    "knowledge-graph",
+    "academic-research"
+  ],
+  "license": "MIT",
+  "sideEffects": false
+}

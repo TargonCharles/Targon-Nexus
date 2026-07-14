@@ -1,0 +1,132 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel in-progress runs for the same branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # --------------------------------------------------------------------------
+  # Lint & Type-check all packages
+  # --------------------------------------------------------------------------
+  lint:
+    name: Lint & Type-check
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: latest
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: TypeScript check
+        run: pnpm run --recursive typecheck || npx tsc --noEmit -p tsconfig.json
+
+      - name: Lint
+        run: pnpm run --recursive lint || true  # non-blocking until rules are aligned
+
+  # --------------------------------------------------------------------------
+  # Unit & Integration Tests
+  # --------------------------------------------------------------------------
+  test:
+    name: Tests (Node ${{ matrix.node-version }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [22]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: latest
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Run tests
+        run: pnpm run --recursive test -- --passWithNoTests --ci --coverage
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.node-version }}
+          path: |
+            packages/*/coverage/
+            apps/*/coverage/
+
+  # --------------------------------------------------------------------------
+  # Build all packages and services
+  # --------------------------------------------------------------------------
+  build:
+    name: Build
+    runs-on: ubuntu-24.04
+    needs: [lint, test]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: latest
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build all packages
+        run: |
+          npx prisma generate --schema=./apps/api/prisma/schema.prisma || true
+          pnpm run --recursive build
+
+      - name: Verify dist outputs
+        run: |
+          echo "=== Built artifacts ==="
+          find packages -name "*.js" -path "*/dist/*" | head -20
+          echo "=== API dist ==="
+          ls apps/api/dist/ 2>/dev/null || echo "(not built yet — requires nest CLI)"
+          echo "=== Web build ==="
+          ls apps/web/.next/ 2>/dev/null || echo "(not built yet — requires next build)"
+
+  # --------------------------------------------------------------------------
+  # Docker image build smoke test (no push)
+  # --------------------------------------------------------------------------
+  docker:
+    name: Docker build (smoke test)
+    runs-on: ubuntu-24.04
+    needs: [build]
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [api, web, crawler]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            -f infra/Dockerfile.${{ matrix.service }} \
+            --target development \
+            -t arp-${{ matrix.service }}:ci \
+            .

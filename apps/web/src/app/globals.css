@@ -1,0 +1,52 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-primary: 37 99 235;
+    --color-secondary: 147 51 234;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+@layer components {
+  .graph-container {
+    @apply relative w-full overflow-hidden rounded-xl border bg-white;
+    min-height: 500px;
+  }
+
+  .entity-card {
+    @apply rounded-xl border bg-white p-4 shadow-sm transition-shadow hover:shadow-md;
+  }
+
+  .evidence-badge {
+    @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium;
+  }
+
+  .confidence-high {
+    @apply bg-green-100 text-green-800;
+  }
+
+  .confidence-medium {
+    @apply bg-yellow-100 text-yellow-800;
+  }
+
+  .confidence-low {
+    @apply bg-red-100 text-red-800;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}

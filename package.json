@@ -1,0 +1,42 @@
+{
+  "name": "arp",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Targon Nexus — AI-Native Academic Knowledge Graph for ARPES Research Community",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"pnpm run --filter @arp/api dev\" \"pnpm run --filter @arp/web dev\"",
+    "dev:api": "pnpm run --filter @arp/api dev",
+    "dev:web": "pnpm run --filter @arp/web dev",
+    "build": "pnpm run --filter @arp/shared build && pnpm run --filter @arp/types build && pnpm run --filter @arp/api build",
+    "lint": "turbo run lint",
+    "test": "pnpm run --filter @arp/shared test && pnpm run --filter @arp/api test",
+    "clean": "turbo run clean",
+    "format": "prettier --write \"**/*.{ts,tsx,js,json,md,cypher}\"",
+    "docker:dev": "docker compose -f infra/docker-compose.yml up -d neo4j postgres redis",
+    "docker:down": "docker compose -f infra/docker-compose.yml down",
+    "db:migrate": "cd apps/api && npx prisma migrate dev",
+    "seed": "curl -X POST http://localhost:3001/api/v1/pipeline/seed",
+    "import-seed": "npx ts-node --project apps/api/tsconfig.json -r tsconfig-paths/register scripts/import-seed.ts",
+    "import-papers": "npx ts-node --project apps/api/tsconfig.json -r tsconfig-paths/register scripts/import-papers.ts",
+    "discover": "npx ts-node --project apps/api/tsconfig.json -r tsconfig-paths/register apps/crawler/src/discover.ts",
+    "agent": "npx ts-node --project apps/api/tsconfig.json -r tsconfig-paths/register scripts/agent.ts",
+    "pipeline": "npx ts-node --project apps/api/tsconfig.json -r tsconfig-paths/register scripts/pipeline.ts"
+  },
+  "devDependencies": {
+    "turbo": "^1.10.0",
+    "prettier": "^3.1.0",
+    "typescript": "^5.3.0",
+    "@types/node": "^20.10.0",
+    "ts-node": "^10.9.0",
+    "concurrently": "^8.2.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "packageManager": "pnpm@8.15.0"
+}

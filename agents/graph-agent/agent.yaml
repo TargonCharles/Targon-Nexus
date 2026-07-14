@@ -1,0 +1,462 @@
+﻿# =============================================================================
+# Graph Agent — Neo4j Knowledge Graph Builder
+# =============================================================================
+# Part of the Targon Nexus (Targon Nexus) agent fabric.
+# Stateless, event-driven agent communicating exclusively through the Event Bus.
+# =============================================================================
+
+agent:
+  name: graph-agent
+  version: "1.0.0"
+  description: >
+    Graph builder agent that writes resolved entities and their relationships
+    into the Neo4j knowledge graph. Handles node creation/merging, relationship
+    creation with mandatory evidence, timeline event management, and source
+    provenance tracking. Never deletes — only archives.
+
+  kind: stateless-event-driven
+
+# ---------------------------------------------------------------------------
+# Event Bus Interface
+# ---------------------------------------------------------------------------
+events:
+  triggers:
+    - ResolutionEvent:
+        description: >
+          Triggered when the resolver-agent emits resolved and deduplicated
+          entities ready for graph insertion.
+        schema: events/resolution_event.json
+        handler: handle_resolution
+
+    - MergeNotification:
+        description: >
+          Triggered when the resolver-agent merges entities. The graph-agent
+          must re-point all relationships from merged entities to the
+          canonical entity.
+        schema: events/merge_notification.json
+        handler: handle_merge
+
+    - GraphQuery:
+        description: >
+          Synchronous query request from the API layer or other agents.
+          Used for existence checks, neighborhood queries, and validation.
+        schema: events/graph_query.json
+        handler: handle_query
+
+  actions:
+    - create_or_update_node:
+        description: >
+          Create a new node or update an existing one. Uses MERGE on unique
+          identifiers (ORCID, email, ROR ID, URL) and SET for properties.
+          Never deletes — only marks as archived.
+        input:
+          entity_type: string         # Node label
+          properties: dict
+          unique_keys: [string]       # Properties used for MERGE matching
+          source_url: string
+        output:
+          node_id: string             # Neo4j internal ID or UUID
+          was_created: boolean
+          was_updated: boolean
+
+    - create_relationship:
+        description: >
+          Create a typed, directed relationship between two nodes with
+          mandatory evidence and provenance properties. Uses MERGE to
+          avoid duplicates.
+        input:
+          from_id: string
+          to_id: string
+          relationship_type: string
+          properties: dict            # Must include: evidence_type, source_url, confidence
+        output:
+          relationship_id: string
+          was_created: boolean
+
+    - create_timeline_event:
+        description: >
+          Attach a timestamped event to an entity node (e.g., "published
+          paper", "moved institution", "won award"). Timeline events form
+          a temporal subgraph for career/institutional history.
+        input:
+          entity_id: string
+          event_type: string
+          timestamp: string           # ISO8601
+          properties: dict
+          source_url: string
+        output:
+          event_id: string
+
+    - link_to_source:
+        description: >
+          Create or update a SOURCED_FROM relationship linking any entity
+          to its original RawDocument source(s) for full provenance.
+        input:
+          entity_id: string
+          source_url: string
+          crawl_event_id: string
+          extraction_event_id: string
+        output:
+          linked: boolean
+
+    - archive_entity:
+        description: >
+          Mark an entity as archived. Does NOT delete the node or its
+          relationships. Sets archived: true and archived_at timestamp.
+          Used when entities are merged or determined to be obsolete.
+        input:
+          entity_id: string
+          reason: string
+          superseded_by: string       # Canonical entity ID (if merged)
+        output:
+          archived: boolean
+
+    - validate_graph_consistency:
+        description: >
+          Run integrity checks on the subgraph affected by recent writes.
+          Verify referential integrity, relationship cardinality, and
+          mandatory property presence.
+        input:
+          scope: string               # "affected_subgraph" | "full"
+        output:
+          issues: [dict]
+          is_consistent: boolean
+
+  emits:
+    - GraphEvent:
+        description: >
+          Emitted after each batch of graph writes, summarizing what was
+          created, updated, and any consistency issues found.
+        schema: events/graph_event.json
+        routing_key: "graph.{entity_type}"
+
+    - GraphIntegrityIssue:
+        description: >
+          Emitted when a consistency check finds a problem: missing required
+          properties, broken relationships, orphan nodes.
+        schema: events/graph_integrity_issue.json
+
+    - GraphStats:
+        description: >
+          Periodic emission of graph statistics: node counts, relationship
+          counts, coverage metrics.
+        schema: events/graph_stats.json
+
+# ---------------------------------------------------------------------------
+# Node Labels & Core Properties
+# ---------------------------------------------------------------------------
+schema:
+  nodes:
+    Person:
+      unique_keys: ["orcid", "email"]
+      required_properties: ["id", "name", "created_at", "updated_at"]
+      indexed_properties: ["name", "orcid", "email", "affiliation"]
+      optional_properties:
+        - aliases
+        - title
+        - research_directions
+        - google_scholar_id
+        - researcher_id
+        - scopus_id
+        - homepage_url
+        - photo_url
+        - biography
+        - h_index
+        - citation_count
+        - country
+
+    Organization:
+      unique_keys: ["ror_id", "domain"]
+      required_properties: ["id", "name", "org_type", "created_at", "updated_at"]
+      indexed_properties: ["name", "ror_id", "domain", "country"]
+      optional_properties:
+        - aliases
+        - acronym
+        - country
+        - city
+        - latitude
+        - longitude
+        - website
+        - wikipedia_url
+        - established_year
+        - org_size
+
+    Lab:
+      unique_keys: ["name", "parent_org_id", "pi_id"]
+      required_properties: ["id", "name", "parent_org_id", "created_at", "updated_at"]
+      indexed_properties: ["name", "pi_name"]
+      optional_properties:
+        - aliases
+        - research_directions
+        - website
+        - description
+        - member_count
+        - founded_year
+
+    Publication:
+      unique_keys: ["doi", "arxiv_id"]
+      required_properties: ["id", "title", "created_at", "updated_at"]
+      indexed_properties: ["title", "doi", "arxiv_id", "publication_date"]
+      optional_properties:
+        - authors_raw
+        - abstract
+        - journal
+        - volume
+        - issue
+        - pages
+        - publication_date
+        - citation_count
+        - publisher
+        - publication_type    # "journal_article" | "conference_paper" | "preprint" | "thesis" | "book"
+
+    Facility:
+      unique_keys: ["name", "ror_id"]
+      required_properties: ["id", "name", "facility_type", "created_at", "updated_at"]
+      indexed_properties: ["name", "country"]
+      optional_properties:
+        - aliases
+        - facility_type      # "synchrotron" | "fel" | "neutron_source" | "beamline"
+        - parent_org_id
+        - website
+        - location
+        - beamlines
+
+    ResearchDirection:
+      unique_keys: ["normalized_name"]
+      required_properties: ["id", "name", "created_at"]
+      indexed_properties: ["name", "taxonomy_path"]
+      optional_properties:
+        - aliases
+        - parent_id           # Hierarchical taxonomy
+        - taxonomy_path
+        - description
+        - related_directions
+
+    Source:
+      unique_keys: ["url"]
+      required_properties: ["id", "url", "source_type", "created_at"]
+      indexed_properties: ["url", "domain", "last_crawled_at"]
+      optional_properties:
+        - domain
+        - title
+        - content_hash
+        - last_crawled_at
+        - last_changed_at
+        - crawl_frequency_days
+
+    Company:
+      unique_keys: ["name", "domain"]
+      required_properties: ["id", "name", "company_type", "created_at", "updated_at"]
+      indexed_properties: ["name", "domain"]
+      optional_properties:
+        - aliases
+        - website
+        - description
+        - company_type        # "instrument_manufacturer" | "software" | "publisher" | "other"
+
+  relationships:
+    - type: AFFILIATED_WITH
+      from: Person
+      to: Organization
+      cardinality: MANY_TO_MANY
+      required_properties: ["evidence_type", "source_url", "confidence"]
+      optional_properties: ["start_date", "end_date", "position", "department"]
+
+    - type: WORKS_AT
+      from: Person
+      to: Lab
+      cardinality: MANY_TO_MANY
+      required_properties: ["evidence_type", "source_url", "confidence"]
+      optional_properties: ["role", "start_date", "end_date"]
+
+    - type: LEADS
+      from: Person
+      to: Lab
+      cardinality: ONE_TO_MANY
+      required_properties: ["evidence_type", "source_url", "confidence"]
+      optional_properties: ["start_date", "end_date"]
+
+    - type: AUTHORED
+      from: Person
+      to: Publication
+      cardinality: MANY_TO_MANY
+      required_properties: ["evidence_type", "source_url", "confidence"]
+      optional_properties: ["author_position", "is_corresponding", "affiliation_at_time"]
+
+    - type: PUBLISHED_IN
+      from: Publication
+      to: Organization       # Publisher or journal
+      cardinality: MANY_TO_ONE
+      required_properties: ["evidence_type", "source_url", "confidence"]
+
+    - type: PARENT_ORG
+      from: Lab
+      to: Organization
+      cardinality: MANY_TO_ONE
+      required_properties: ["evidence_type", "source_url", "confidence"]
+
+    - type: PART_OF
+      from: Organization     # Department
+      to: Organization       # University
+      cardinality: MANY_TO_ONE
+      required_properties: ["evidence_type", "source_url", "confidence"]
+
+    - type: HOSTED_BY
+      from: Facility
+      to: Organization
+      cardinality: MANY_TO_ONE
+      required_properties: ["evidence_type", "source_url", "confidence"]
+
+    - type: RESEARCHES
+      from: Person
+      to: ResearchDirection
+      cardinality: MANY_TO_MANY
+      required_properties: ["evidence_type", "source_url", "confidence"]
+
+    - type: LAB_RESEARCHES
+      from: Lab
+      to: ResearchDirection
+      cardinality: MANY_TO_MANY
+      required_properties: ["evidence_type", "source_url", "confidence"]
+
+    - type: CITES
+      from: Publication
+      to: Publication
+      cardinality: MANY_TO_MANY
+      required_properties: ["evidence_type", "source_url", "confidence"]
+
+    - type: SOURCED_FROM
+      from: ANY
+      to: Source
+      cardinality: MANY_TO_MANY
+      required_properties: ["evidence_type", "crawl_event_id"]
+
+    - type: COLLABORATES_WITH
+      from: Person
+      to: Person
+      cardinality: MANY_TO_MANY
+      required_properties: ["evidence_type", "source_url", "confidence"]
+      optional_properties: ["co_authored_papers_count", "first_collaboration_date", "latest_collaboration_date"]
+
+    - type: ADVISED_BY
+      from: Person
+      to: Person
+      cardinality: MANY_TO_MANY
+      required_properties: ["evidence_type", "source_url", "confidence"]
+      optional_properties: ["advisor_role", "degree", "start_year", "end_year", "thesis_title"]
+
+    - type: MANUFACTURES
+      from: Company
+      to: Facility
+      cardinality: MANY_TO_MANY
+      required_properties: ["evidence_type", "source_url", "confidence"]
+
+    - type: USES_EQUIPMENT
+      from: Lab
+      to: Facility
+      cardinality: MANY_TO_MANY
+      required_properties: ["evidence_type", "source_url", "confidence"]
+
+# ---------------------------------------------------------------------------
+# Configuration
+# ---------------------------------------------------------------------------
+config:
+  neo4j:
+    uri: "${NEO4J_URI}"
+    database: "arpes"
+    connection_pool_size: 10
+    query_timeout_secs: 30
+    max_transaction_retries: 3
+
+  write_strategy:
+    use_merge: true                  # Use MERGE to avoid duplicates
+    batch_size: 100                  # Write in batches of 100 operations
+    transaction_timeout_secs: 60
+    retry_on_conflict: true
+
+  id_generation:
+    method: "uuid_v4"                # All new entities get UUID v4
+    namespace_uuid: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"  # For deterministic UUIDs
+
+  relationship_requirements:
+    require_evidence: true
+    require_source_url: true
+    require_confidence: true
+    require_timestamp: true
+    evidence_types:
+      - "orcid"
+      - "email"
+      - "doi"
+      - "ror_id"
+      - "web_page"
+      - "publication"
+      - "manual_curation"
+      - "llm_extraction"
+      - "regex_extraction"
+
+  conflict_resolution:
+    strategy: "higher_confidence_wins"
+    record_conflicts: true
+    notify_on_conflict: true
+
+  archiving:
+    never_delete: true
+    archive_reasons:
+      - "merged"
+      - "obsolete"
+      - "duplicate"
+      - "incorrect"
+
+# ---------------------------------------------------------------------------
+# Timeline Events
+# ---------------------------------------------------------------------------
+timeline:
+  enabled: true
+  event_types:
+    - "published_paper"
+    - "joined_institution"
+    - "left_institution"
+    - "founded_lab"
+    - "won_award"
+    - "gave_talk"
+    - "organized_conference"
+    - "received_grant"
+    - "graduated"
+    - "facility_commissioned"
+    - "facility_upgraded"
+  auto_create_on:
+    - "published_paper"              # When AUTHORED relationship is created
+    - "joined_institution"           # When AFFILIATED_WITH start_date is set
+    - "left_institution"             # When AFFILIATED_WITH end_date is set
+
+# ---------------------------------------------------------------------------
+# Resources & Limits
+# ---------------------------------------------------------------------------
+resources:
+  cpu_limit: "2.0"
+  memory_limit_mb: 2048
+  disk_limit_gb: 20
+
+# ---------------------------------------------------------------------------
+# Observability
+# ---------------------------------------------------------------------------
+observability:
+  metrics:
+    - nodes_created_total
+    - nodes_updated_total
+    - nodes_archived_total
+    - relationships_created_total
+    - relationships_merged_total
+    - write_errors_total
+    - write_duration_seconds
+    - batch_writes_total
+    - conflicts_detected_total
+    - consistency_check_duration_seconds
+    - graph_size_nodes
+    - graph_size_relationships
+  logging:
+    level: info
+    structured: true
+  tracing:
+    enabled: true
+    propagate_context: true

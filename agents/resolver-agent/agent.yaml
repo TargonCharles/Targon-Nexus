@@ -1,0 +1,298 @@
+﻿# =============================================================================
+# Resolver Agent — Identity Resolution & Entity Deduplication
+# =============================================================================
+# Part of the Targon Nexus (Targon Nexus) agent fabric.
+# Stateless, event-driven agent communicating exclusively through the Event Bus.
+# =============================================================================
+
+agent:
+  name: resolver-agent
+  version: "1.0.0"
+  description: >
+    Identity resolution agent for entity deduplication and canonicalization.
+    Disambiguates persons, merges labs, consolidates aliases, normalizes
+    company names, and standardizes research directions across all extracted
+    entities before graph insertion.
+
+  kind: stateless-event-driven
+
+# ---------------------------------------------------------------------------
+# Event Bus Interface
+# ---------------------------------------------------------------------------
+events:
+  triggers:
+    - ExtractionEvent:
+        description: >
+          Triggered when the parser-agent extracts entities (persons,
+          organizations, identifiers) from a document. The resolver-agent
+          attempts to match each entity against the existing knowledge graph.
+        schema: events/extraction_event.json
+        handler: handle_extraction
+
+    - ResolutionRequest:
+        description: >
+          Manual or QA-triggered request to re-resolve a specific entity
+          or set of entities.
+        schema: events/resolution_request.json
+        handler: handle_resolution_request
+
+    - FlaggedEntityReview:
+        description: >
+          Triggered when a human reviewer provides a decision on a
+          previously flagged low-confidence case.
+        schema: events/flagged_entity_review.json
+        handler: handle_flagged_review
+
+  actions:
+    - resolve_person:
+        description: >
+          Given a person name + context (affiliation, email, ORCID),
+          resolve to a canonical Person entity. If no match found,
+          create a new pending entity.
+        input:
+          name: string
+          aliases: [string]
+          affiliations: [string]
+          email: string
+          orcid: string
+          source_urls: [string]
+          context: string
+        output:
+          canonical_id: string       # UUID of matched or new entity
+          match_confidence: float
+          match_method: string       # "orcid" | "email" | "doi" | "fuzzy_name_affil" | "llm_disambig" | "new"
+          is_new: boolean
+          needs_review: boolean
+          candidates: [dict]         # Alternative matches considered
+
+    - resolve_organization:
+        description: >
+          Given an organization name + context (address, ROR ID, domain),
+          resolve to a canonical Organization entity.
+        input:
+          name: string
+          aliases: [string]
+          country: string
+          domain: string
+          ror_id: string
+          org_type: string           # "university" | "lab" | "facility" | "company" | "publisher" | "conference"
+        output:
+          canonical_id: string
+          match_confidence: float
+          match_method: string
+          is_new: boolean
+          needs_review: boolean
+
+    - resolve_lab:
+        description: >
+          Specialized resolution for research labs/groups. Labs often have
+          informal names and are sub-units of universities.
+        input:
+          name: string
+          aliases: [string]
+          parent_org: string         # University or institution containing this lab
+          pi_name: string
+          domain: string
+        output:
+          canonical_id: string
+          match_confidence: float
+          match_method: string
+          is_new: boolean
+          merged_from: [string]      # IDs of labs merged into canonical
+
+    - merge_entities:
+        description: >
+          Merge two or more entities that have been determined to refer
+          to the same real-world entity. Consolidates all properties,
+          relationships, and sources.
+        input:
+          canonical_id: string       # Keep this one
+          merge_ids: [string]        # Merge these into canonical
+          merge_reason: string
+          merge_confidence: float
+        output:
+          merged_count: integer
+          canonical_updated: boolean
+
+    - normalize_research_direction:
+        description: >
+          Map a raw research direction string to a standardized term from
+          the ARPES research taxonomy.
+        input:
+          raw_text: string
+          context: string
+        output:
+          standardized_term: string
+          taxonomy_id: string
+          synonyms_matched: [string]
+          confidence: float
+
+  emits:
+    - ResolutionEvent:
+        description: >
+          Emitted for each batch of resolved entities, containing canonical
+          entities ready for graph insertion plus any merge decisions.
+        schema: events/resolution_event.json
+        routing_key: "resolution.{entity_type}"
+
+    - FlaggedForReview:
+        description: >
+          Emitted when an entity cannot be resolved with sufficient
+          confidence and requires human review.
+        schema: events/flagged_for_review.json
+
+    - MergeNotification:
+        description: >
+          Emitted when entities are merged, so the graph-agent can
+          update relationships accordingly.
+        schema: events/merge_notification.json
+
+# ---------------------------------------------------------------------------
+# Resolution Strategies (in priority order)
+# ---------------------------------------------------------------------------
+resolution:
+  person:
+    # Exact match strategies (confidence >= 0.99)
+    - method: orcid_match
+      confidence: 0.99
+      description: "Match by ORCID. If two person entities share the same ORCID, they are the same person."
+
+    - method: email_match
+      confidence: 0.95
+      description: "Match by institutional email. Less reliable than ORCID (emails change)."
+
+    - method: doi_coauthorship
+      confidence: 0.90
+      description: "Match by shared DOI + author position. If two names appear as authors on the same paper, cross-reference affiliations."
+
+    # Fuzzy match strategies (confidence 0.7-0.95)
+    - method: fuzzy_name_affiliation
+      confidence_range: [0.70, 0.90]
+      description: >
+        Fuzzy string match on name (Levenshtein distance, Jaro-Winkler)
+        combined with affiliation overlap. Accounts for: name variations
+        ("J. Smith" vs "John Smith"), transliteration differences, Chinese
+        name ordering ambiguity, middle initial presence/absence.
+
+    # LLM-based disambiguation (confidence 0.5-0.85)
+    - method: llm_disambiguation
+      confidence_range: [0.50, 0.85]
+      description: >
+        For ambiguous cases, pass the candidate set to an LLM with rich
+        context (publication history, co-author network, research topics,
+        career timeline). LLM returns a match decision with explanation.
+        Used only when fuzzy matching is inconclusive.
+
+  organization:
+    - method: ror_match
+      confidence: 0.99
+      description: "Match by ROR ID (Research Organization Registry)."
+
+    - method: domain_match
+      confidence: 0.90
+      description: "Match by primary domain name (e.g., mit.edu)."
+
+    - method: fuzzy_name_location
+      confidence_range: [0.70, 0.85]
+      description: "Fuzzy name match + country/city overlap. Handles aliases."
+
+    - method: llm_disambiguation
+      confidence_range: [0.50, 0.80]
+      description: "LLM-based for complex cases (mergers, renamed institutions)."
+
+  lab:
+    - method: exact_name_pi
+      confidence: 0.95
+      description: "Match by normalized lab name + PI name."
+
+    - method: fuzzy_name_parent_pi
+      confidence_range: [0.70, 0.90]
+      description: "Fuzzy name + parent org + PI overlap."
+
+    - method: llm_disambiguation
+      confidence_range: [0.50, 0.80]
+      description: "LLM-based for labs that have moved institutions or changed names."
+
+# ---------------------------------------------------------------------------
+# Configuration
+# ---------------------------------------------------------------------------
+config:
+  matching:
+    name_similarity_threshold: 0.85    # Jaro-Winkler minimum
+    fuzzy_algorithm: "token_sort_ratio" # FuzzyWuzzy algorithm
+    consider_affiliation: true
+    consider_coauthors: true
+    consider_research_topics: true
+    max_candidates_to_review: 10
+
+  merge:
+    auto_merge_threshold: 0.95         # Auto-merge if confidence >= this
+    review_threshold: 0.60             # Flag for review if confidence < this
+    keep_most_complete: true           # When merging, keep the entity with most properties
+    consolidate_sources: true          # Merge source_urls from all entities
+    consolidate_aliases: true          # Merge aliases from all entities
+    relationship_preservation: true    # Re-point all relationships to canonical
+
+  llm:
+    model: "claude-sonnet-4-20250514"
+    max_tokens: 2000
+    temperature: 0.1                   # Low temp for deterministic disambiguation
+    context_window_chars: 8000
+    prompt_template: "resolver_llm_prompt"
+
+  normalization:
+    person_name:
+      case: "title"                    # "John Smith"
+      diacritics: "preserve"           # Keep accents
+      order: "given_first"             # Western name order
+      chinese_name_handling: "detect_and_flag"
+    organization_name:
+      abbreviations:
+        "MIT": "Massachusetts Institute of Technology"
+        "Caltech": "California Institute of Technology"
+        "ETH Zurich": "Eidgenössische Technische Hochschule Zürich"
+        "UC Berkeley": "University of California, Berkeley"
+      strip_suffixes: ["Inc.", "Ltd.", "Corp.", "LLC", "GmbH", "Co., Ltd."]
+    research_direction:
+      taxonomy_source: "arpes_taxonomy.yaml"
+      allow_new_terms: true
+      synonym_expansion: true
+
+# ---------------------------------------------------------------------------
+# Confidence Scoring
+# ---------------------------------------------------------------------------
+confidence:
+  high: 0.90        # Auto-accept, no review needed
+  medium: 0.70      # Accept but log for spot-check
+  low: 0.50         # Flag for human review
+  insufficient: 0.0 # Create new entity, do not merge
+
+# ---------------------------------------------------------------------------
+# Resources & Limits
+# ---------------------------------------------------------------------------
+resources:
+  cpu_limit: "2.0"
+  memory_limit_mb: 2048
+  disk_limit_gb: 10
+
+# ---------------------------------------------------------------------------
+# Observability
+# ---------------------------------------------------------------------------
+observability:
+  metrics:
+    - entities_resolved_total
+    - entities_merged_total
+    - entities_created_total
+    - flagged_for_review_total
+    - resolution_confidence_histogram
+    - resolution_duration_seconds
+    - llm_calls_total
+    - orcid_matches_total
+    - email_matches_total
+    - fuzzy_matches_total
+  logging:
+    level: info
+    structured: true
+  tracing:
+    enabled: true
+    propagate_context: true

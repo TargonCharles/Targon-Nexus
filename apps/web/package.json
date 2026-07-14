@@ -1,0 +1,31 @@
+{
+  "name": "@arp/web",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Targon Nexus Next.js Frontend — Academic Knowledge Graph Explorer",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "next": "^14.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "@tanstack/react-query": "^5.0.0",
+    "cytoscape": "^3.28.0",
+    "d3": "^7.8.0",
+    "@arp/ui": "workspace:*",
+    "@arp/shared": "workspace:*",
+    "@arp/types": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "@types/d3": "^7.4.0",
+    "typescript": "^5.3.0",
+    "tailwindcss": "^3.4.0",
+    "autoprefixer": "^10.4.0",
+    "postcss": "^8.4.0"
+  }
+}

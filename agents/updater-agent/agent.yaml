@@ -1,0 +1,297 @@
+﻿# =============================================================================
+# Updater Agent — Scheduling & Periodic Sync Management
+# =============================================================================
+# Part of the Targon Nexus (Targon Nexus) agent fabric.
+# Stateless, event-driven agent communicating exclusively through the Event Bus.
+# =============================================================================
+
+agent:
+  name: updater-agent
+  version: "1.0.0"
+  description: >
+    Scheduling and update agent managing periodic sync cycles for the entire
+    ARPES knowledge graph pipeline. Triggers re-crawling, re-extraction, graph
+    updates, and validation. Generates change reports and maintains sync history.
+    Acts as the orchestrator for the full ETL pipeline on a scheduled cadence.
+
+  kind: stateless-event-driven
+
+# ---------------------------------------------------------------------------
+# Event Bus Interface
+# ---------------------------------------------------------------------------
+events:
+  triggers:
+    - CronEvent:
+        description: >
+          Daily, weekly, and monthly cron triggers that initiate sync cycles.
+          Each cron type maps to a different sync scope.
+        schema: events/cron_event.json
+        handler: handle_cron
+        filter:
+          cron_type: ["daily-sync", "weekly-full-sync", "monthly-deep-sync"]
+
+    - SyncRequest:
+        description: >
+          On-demand sync request from the API layer or a human operator.
+          Can target specific domains, entities, or a full sync.
+        schema: events/sync_request.json
+        handler: handle_sync_request
+
+    - PipelineProgress:
+        description: >
+          Progress events from downstream agents (crawler, parser, resolver,
+          graph) during a sync cycle. Used to track completion and detect
+          stalls.
+        schema: events/pipeline_progress.json
+        handler: handle_progress
+
+  actions:
+    - determine_sync_scope:
+        description: >
+          Analyze the graph to determine which entities and sources are stale
+          and need updating. Uses last_crawled_at, update frequency, and
+          change detection heuristics.
+        input:
+          sync_type: string         # "daily" | "weekly" | "monthly" | "targeted"
+          target_domains: [string]  # Optional: specific domains to sync
+          target_entities: [string] # Optional: specific entity UUIDs to update
+        output:
+          sources_to_recrawl: [dict]
+          entities_to_reverify: [dict]
+          estimated_duration_minutes: integer
+
+    - trigger_recrawl:
+        description: >
+          Emit RecrawlRequest events for each stale source identified in
+          the sync scope. Batches URLs by domain to respect rate limits.
+        input:
+          sources: [dict]           # [{url, domain, last_crawled_at, priority}]
+        output:
+          recrawl_events_emitted: integer
+          domains_queued: integer
+
+    - trigger_resolution_rerun:
+        description: >
+          For entities with low-confidence resolutions or flagged-for-review
+          entities, re-trigger the resolver-agent with updated context.
+        input:
+          entity_ids: [string]
+        output:
+          resolution_events_emitted: integer
+
+    - generate_change_report:
+        description: >
+          Compare the post-sync graph state with the pre-sync snapshot to
+          produce a human-readable change report.
+        input:
+          sync_id: string
+          pre_sync_snapshot_id: string
+        output:
+          report: dict
+          changes: [dict]
+
+    - handle_failure:
+        description: >
+          When a sync stage fails or stalls, determine the appropriate
+          response: retry, skip, partial completion, or abort.
+        input:
+          stage: string             # "crawl" | "parse" | "resolve" | "graph"
+          error: dict
+          progress: dict
+        output:
+          action: string            # "retry" | "skip_stage" | "partial_complete" | "abort"
+          reason: string
+
+    - track_sync_history:
+        description: >
+          Record the outcome of each sync cycle in persistent storage for
+          audit trail and trend analysis.
+        input:
+          sync_summary: dict
+        output:
+          sync_record_id: string
+
+  emits:
+    - RecrawlRequest:
+        description: >
+          Emitted to the crawler-agent for each URL that needs re-crawling.
+        schema: events/recrawl_request.json
+
+    - ReExtractRequest:
+        description: >
+          Emitted to the parser-agent for documents that need re-extraction
+          (e.g., after parser improvements).
+        schema: events/reextract_request.json
+
+    - ResolutionRequest:
+        description: >
+          Emitted to the resolver-agent for entities that need re-resolution.
+        schema: events/resolution_request.json
+
+    - ValidationTrigger:
+        description: >
+          Emitted to the qa-agent to trigger validation after sync completes.
+        schema: events/validation_trigger.json
+
+    - SyncComplete:
+        description: >
+          Emitted when a sync cycle finishes (successfully or with failures).
+          Contains the full sync summary and change report.
+        schema: events/sync_complete.json
+
+# ---------------------------------------------------------------------------
+# Sync Schedules & Staleness Rules
+# ---------------------------------------------------------------------------
+schedules:
+  daily_sync:
+    cron: "0 2 * * *"                # 2:00 AM daily
+    scope: "high_priority"
+    rules:
+      - entity_types: ["Person", "Lab"]
+        staleness_threshold_days: 1
+        limit: 50                    # Max entities per cycle
+      - entity_types: ["News"]
+        staleness_threshold_days: 1
+        limit: 20
+
+  weekly_full_sync:
+    cron: "0 3 * * 0"                # 3:00 AM Sunday
+    scope: "medium_priority"
+    rules:
+      - entity_types: ["Publication", "Organization"]
+        staleness_threshold_days: 7
+        limit: 200
+      - entity_types: ["ResearchDirection"]
+        staleness_threshold_days: 30
+        limit: 50
+
+  monthly_deep_sync:
+    cron: "0 4 1 * *"                # 4:00 AM on 1st of month
+    scope: "all"
+    rules:
+      - entity_types: ["ALL"]
+        staleness_threshold_days: 30
+        limit: 1000
+      - include: "low_confidence_entities"
+      - include: "flagged_for_review"
+      - include: "orphan_source_validation"
+
+# ---------------------------------------------------------------------------
+# Staleness Detection
+# ---------------------------------------------------------------------------
+staleness:
+  # How frequently different entity types should be re-crawled
+  crawl_frequencies:
+    lab_homepage: 7                  # Days
+    personal_profile: 30
+    news: 1
+    publication: 90                  # Publications rarely change
+    facility_page: 30
+    conference_page: 14
+    general_academic: 60
+
+  # Entities become stale when...
+  staleness_triggers:
+    - type: "time_elapsed"
+      description: "last_crawled_at exceeds crawl_frequency"
+    - type: "low_confidence"
+      description: "Any entity or relationship with confidence < 0.70"
+    - type: "no_source"
+      description: "Entity missing SOURCED_FROM relationship"
+    - type: "manual_flag"
+      description: "Entity explicitly flagged for re-verification"
+    - type: "new_seeds"
+      description: "Newly discovered URLs that have never been crawled"
+
+# ---------------------------------------------------------------------------
+# Pipeline Coordination
+# ---------------------------------------------------------------------------
+pipeline:
+  stages:
+    - name: "crawl"
+      agent: "crawler-agent"
+      timeout_minutes: 60
+      retry_strategy: "exponential_backoff"
+      max_retries: 2
+
+    - name: "parse"
+      agent: "parser-agent"
+      timeout_minutes: 30
+      retry_strategy: "immediate"
+      max_retries: 1
+
+    - name: "resolve"
+      agent: "resolver-agent"
+      timeout_minutes: 15
+      retry_strategy: "immediate"
+      max_retries: 1
+
+    - name: "graph"
+      agent: "graph-agent"
+      timeout_minutes: 10
+      retry_strategy: "immediate"
+      max_retries: 1
+
+    - name: "validate"
+      agent: "qa-agent"
+      timeout_minutes: 30
+      retry_strategy: "none"
+      max_retries: 0
+
+  progress_tracking:
+    method: "event_counting"
+    stall_detection_minutes: 15
+    on_stall: "emit_warning_and_continue"
+
+  failure_handling:
+    partial_completion: true         # Allow sync to complete partially
+    max_failure_rate: 0.20           # Abort if >20% of operations fail
+    on_critical_failure: "abort_and_notify"
+
+# ---------------------------------------------------------------------------
+# Change Detection & Reporting
+# ---------------------------------------------------------------------------
+change_reporting:
+  enabled: true
+  compare_fields:
+    - "nodes_added"
+    - "nodes_updated"
+    - "nodes_archived"
+    - "relationships_added"
+    - "relationships_removed"
+    - "entities_merged"
+    - "new_sources_crawled"
+    - "validation_issues_resolved"
+    - "validation_issues_new"
+  generate_diff: true
+  output_format: "markdown"
+  notify_channels: ["event_bus", "log"]
+
+# ---------------------------------------------------------------------------
+# Resources & Limits
+# ---------------------------------------------------------------------------
+resources:
+  cpu_limit: "1.0"
+  memory_limit_mb: 1024
+  disk_limit_gb: 10
+
+# ---------------------------------------------------------------------------
+# Observability
+# ---------------------------------------------------------------------------
+observability:
+  metrics:
+    - sync_cycles_completed_total
+    - sync_cycles_failed_total
+    - sync_duration_seconds
+    - recrawl_events_emitted_total
+    - pipeline_stage_duration_seconds
+    - pipeline_stalls_detected_total
+    - entities_stale_count
+    - sources_stale_count
+    - sync_success_rate
+  logging:
+    level: info
+    structured: true
+  tracing:
+    enabled: true
+    propagate_context: true

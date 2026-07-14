@@ -1,0 +1,73 @@
+# =============================================================================
+# ARP Crawler — Playwright + Crawlee Web Scraper Dockerfile
+# =============================================================================
+# Uses Microsoft Playwright base image for built-in browser binaries.
+# Runs as a persistent worker that processes crawl jobs from a Redis queue.
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# Stage 1: Dependencies
+# ---------------------------------------------------------------------------
+FROM mcr.microsoft.com/playwright:v1.52.0-noble AS deps
+WORKDIR /app
+
+# Install pnpm
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+# Copy workspace config
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc* ./
+COPY apps/crawler/package.json ./apps/crawler/
+COPY packages/*/package.json ./packages/
+
+# Install dependencies (skip Playwright browser download — already in base image)
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+RUN pnpm install --frozen-lockfile --filter @arp/crawler
+
+# ---------------------------------------------------------------------------
+# Stage 2: Production Runner
+# ---------------------------------------------------------------------------
+FROM mcr.microsoft.com/playwright:v1.52.0-noble AS production
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    tini \
+    curl \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN groupadd -r arp && useradd -r -g arp -G audio,video arp \
+    && mkdir -p /app/data /home/arp \
+    && chown -R arp:arp /app /home/arp
+
+# Copy dependencies and source
+COPY --from=deps --chown=arp:arp /app/node_modules ./node_modules
+COPY --from=deps --chown=arp:arp /app/apps/crawler/node_modules ./apps/crawler/node_modules
+COPY --from=deps --chown=arp:arp /app/packages ./packages
+
+COPY apps/crawler/tsconfig*.json ./apps/crawler/
+COPY apps/crawler/src ./apps/crawler/src
+COPY apps/crawler/package.json ./apps/crawler/
+
+# Copy workspace root files for pnpm
+COPY package.json pnpm-workspace.yaml .npmrc* ./
+
+# Build TypeScript crawler code
+RUN pnpm run --filter @arp/crawler build || true
+
+USER arp
+
+ENV NODE_ENV=production
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+ENV CRAWLER_CONCURRENCY=3
+ENV CRAWLER_HEADFUL=false
+
+# Create data directory for crawler storage
+RUN mkdir -p /app/data/datasets /app/data/screenshots
+
+HEALTHCHECK --interval=60s --timeout=10s --start-period=30s --retries=3 \
+  CMD curl -f http://localhost:${CRAWLER_METRICS_PORT:-9090}/health || exit 1
+
+ENTRYPOINT ["/usr/bin/tini", "--"]
+CMD ["node", "apps/crawler/src/main.js"]

@@ -1,0 +1,239 @@
+﻿# =============================================================================
+# Crawler Agent — Web Crawling via Playwright + Crawlee
+# =============================================================================
+# Part of the Targon Nexus (Targon Nexus) agent fabric.
+# Stateless, event-driven agent communicating exclusively through the Event Bus.
+# =============================================================================
+
+agent:
+  name: crawler-agent
+  version: "1.0.0"
+  description: >
+    Web crawler agent using Playwright + Crawlee for headless browser automation.
+    Fetches HTML pages, downloads PDFs, synchronizes lab homepages, and collects
+    news articles relevant to the ARPES research community.
+
+  kind: stateless-event-driven
+
+# ---------------------------------------------------------------------------
+# Event Bus Interface
+# ---------------------------------------------------------------------------
+events:
+  triggers:
+    - DiscoveryEvent:
+        description: >
+          Event emitted when new URLs or domains are discovered, either from
+          manual submission, seed-list expansion, or upstream resolvers.
+        schema: events/discovery_event.json
+        handler: handle_discovery
+
+    - RecrawlRequest:
+        description: >
+          Fired by the updater-agent to trigger targeted re-crawling of
+          previously indexed pages that have exceeded their freshness threshold.
+        schema: events/recrawl_request.json
+        handler: handle_recrawl
+
+    - CronEvent:
+        description: >
+          Periodic trigger for sweeping known seed domains on a schedule.
+        schema: events/cron_event.json
+        handler: handle_cron
+        filter:
+          cron_type: "daily-crawl"
+
+  actions:
+    - fetch_page:
+        description: >
+          Navigate to a URL with Playwright, wait for network idle, capture the
+          full rendered DOM, and return HTML + metadata.
+        input:
+          url: string
+          wait_for: string          # CSS selector to wait for (optional)
+          timeout_ms: integer       # Navigation timeout (default 30000)
+        output:
+          html: string
+          status_code: integer
+          headers: dict
+          title: string
+          final_url: string         # After redirects
+          content_type: string
+
+    - download_pdf:
+        description: >
+          Detect PDF links on a page, download the PDF binary, compute a
+          content hash, and store it for the parser-agent.
+        input:
+          url: string
+          referrer: string
+        output:
+          pdf_path: string          # Local path to downloaded file
+          content_hash: string      # SHA-256 of the PDF binary
+          size_bytes: integer
+          filename: string
+
+    - sync_lab_homepage:
+        description: >
+          Polite, depth-limited crawl of a known lab website. Follows internal
+          links up to max_depth=3. Extracts organizational structure and
+          publication lists.
+        input:
+          start_url: string
+          domain: string
+          max_depth: integer        # Default 3
+        output:
+          pages_crawled: integer
+          pdfs_discovered: [string]
+          external_links: [string]
+
+    - collect_news:
+        description: >
+          Targeted crawl of academic news sections and conference announcement
+          pages for the ARPES community.
+        input:
+          feeds: [string]           # List of known news URLs
+        output:
+          articles: [dict]          # List of {url, title, date, snippet}
+
+    - extract_hyperlinks:
+        description: >
+          After rendering a page, extract all anchor href values (both absolute
+          and relative), classify them (internal/external/pdf/other), and
+          deduplicate.
+        input:
+          html: string
+          base_url: string
+        output:
+          internal_links: [string]
+          external_links: [string]
+          pdf_links: [string]
+
+  emits:
+    - RawDocument:
+        description: >
+          Emitted for every successfully fetched page or downloaded PDF.
+          Contains the raw content plus crawl metadata.
+        schema: events/raw_document.json
+        routing_key: "raw_document.{content_type}"
+
+    - CrawlError:
+        description: >
+          Emitted when a crawl operation fails after all retry attempts.
+        schema: events/crawl_error.json
+
+    - SeedsDiscovered:
+        description: >
+          Emitted when new URLs are found during crawling that should be added
+          to the seed list.
+        schema: events/seeds_discovered.json
+
+# ---------------------------------------------------------------------------
+# Configuration
+# ---------------------------------------------------------------------------
+config:
+  playwright:
+    browser: chromium
+    headless: true
+    viewport:
+      width: 1920
+      height: 1080
+    user_agent: >
+      Mozilla/5.0 (compatible; TargonNexus-Crawler/1.0; +https://targon-nexus.org/bot)
+    extra_http_headers:
+      Accept-Language: "en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7"
+
+  crawlee:
+    max_requests_per_crawl: 5000
+    max_concurrency: 3
+    request_timeout_secs: 60
+    use_session_pool: true
+    persist_state: true
+
+  rate_limiting:
+    min_delay_between_requests_ms: 1000    # 1 req/sec per domain
+    max_delay_between_requests_ms: 3000
+    domain_parallelism: 1                  # One domain at a time
+    honor_robots_txt: true
+    crawl_delay_respect: true
+
+  retry:
+    max_retries: 3
+    backoff_base_ms: 1000
+    backoff_max_ms: 60000
+    retry_on_status_codes: [429, 500, 502, 503, 504]
+    retry_on_network_errors: true
+
+  scope:
+    allowed_domains:
+      - "*.edu"
+      - "*.ac.cn"
+      - "*.ac.jp"
+      - "*.ac.kr"
+      - "*.ac.uk"
+      - "*.edu.cn"
+      - "arxiv.org"
+      - "researchgate.net"
+      - "scholar.google.com"
+      - "*.iop.org"
+      - "journals.aps.org"
+      - "*.nature.com"
+      - "*.science.org"
+      - "pubs.acs.org"
+      - "link.springer.com"
+    blocked_domains:
+      - "facebook.com"
+      - "twitter.com"
+      - "x.com"
+      - "linkedin.com"
+      - "instagram.com"
+      - "youtube.com"
+    content_types:
+      - "text/html"
+      - "application/pdf"
+    max_page_size_mb: 100
+
+  change_detection:
+    enabled: true
+    method: "content_hash"          # SHA-256 of normalized body text
+    ignore_elements:
+      - "script"
+      - "style"
+      - "nav.footer"
+      - ".timestamp"
+      - ".last-modified"
+
+  screenshots:
+    enabled: true
+    format: "png"
+    full_page: true
+    on_error_only: false
+    viewport_width: 1920
+
+# ---------------------------------------------------------------------------
+# Resources & Limits
+# ---------------------------------------------------------------------------
+resources:
+  cpu_limit: "2.0"
+  memory_limit_mb: 2048
+  disk_limit_gb: 50
+  network_egress_limit_gb_per_day: 10
+
+# ---------------------------------------------------------------------------
+# Observability
+# ---------------------------------------------------------------------------
+observability:
+  metrics:
+    - pages_crawled_total
+    - pdfs_downloaded_total
+    - crawl_errors_total
+    - crawl_duration_seconds
+    - bytes_downloaded_total
+    - domains_visited
+    - robots_txt_respect_rate
+  logging:
+    level: info
+    structured: true
+    redact_pii: true
+  tracing:
+    enabled: true
+    propagate_context: true

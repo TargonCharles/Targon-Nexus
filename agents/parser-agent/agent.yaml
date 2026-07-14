@@ -1,0 +1,248 @@
+﻿# =============================================================================
+# Parser Agent — HTML/PDF to Structured Markdown
+# =============================================================================
+# Part of the Targon Nexus (Targon Nexus) agent fabric.
+# Stateless, event-driven agent communicating exclusively through the Event Bus.
+# =============================================================================
+
+agent:
+  name: parser-agent
+  version: "1.0.0"
+  description: >
+    Document parser converting raw HTML pages and PDF files into clean,
+    structured markdown with extracted metadata. Handles table extraction,
+    list normalization, OCR for scanned PDFs, and language detection.
+
+  kind: stateless-event-driven
+
+# ---------------------------------------------------------------------------
+# Event Bus Interface
+# ---------------------------------------------------------------------------
+events:
+  triggers:
+    - CrawlEvent:
+        description: >
+          Triggered when the crawler-agent emits a RawDocument event.
+          The parser-agent subscribes to raw_document.* routing keys.
+        schema: events/crawl_event.json
+        handler: handle_raw_document
+
+  actions:
+    - html_to_markdown:
+        description: >
+          Convert a raw HTML page into semantic, clean markdown. Strips
+          boilerplate (nav, footer, ads), preserves document structure,
+          and extracts metadata.
+        input:
+          html: string
+          url: string
+          page_type: string          # From crawl metadata
+        output:
+          markdown: string
+          metadata: dict
+          tables: [dict]             # Extracted tables as list-of-dicts
+          headings: [dict]           # Heading hierarchy with anchors
+          lists: [dict]              # Structured list data
+
+    - pdf_to_text:
+        description: >
+          Convert a PDF file to markdown text. Uses pdfplumber for
+          text-based PDFs and Tesseract OCR for scanned/image-based PDFs.
+          Detects and preserves multi-column layouts.
+        input:
+          pdf_path: string
+          url: string
+          content_hash: string
+        output:
+          markdown: string
+          metadata: dict
+          is_scanned: boolean
+          ocr_confidence: float      # 0.0-1.0 if OCR was used
+          page_count: integer
+          tables: [dict]
+          images: [dict]             # Extracted figure metadata
+
+    - extract_tables:
+        description: >
+          Extract all tables from a document and convert to markdown table
+          format + structured JSON for the graph-agent.
+        input:
+          content: string            # HTML or markdown
+          source_format: string      # "html" or "pdf"
+        output:
+          tables: [dict]             # {caption, headers, rows, markdown, context}
+
+    - extract_lists:
+        description: >
+          Identify and normalize all list structures (unordered, ordered,
+          definition lists) in the document.
+        input:
+          content: string
+          source_format: string
+        output:
+          lists: [dict]              # {type, items, context_heading, position}
+
+    - detect_language:
+        description: >
+          Classify the document's primary language (Chinese, English, or
+          mixed) and identify sections in each language.
+        input:
+          text: string
+        output:
+          primary_language: string   # "en" | "zh" | "mixed"
+          language_sections: [dict]  # [{start_char, end_char, language}]
+          confidence: float
+
+  emits:
+    - StructuredDocument:
+        description: >
+          Emitted for each successfully parsed document, containing clean
+          markdown, metadata, extracted tables/lists, and language info.
+        schema: events/structured_document.json
+        routing_key: "structured_document.{page_type}"
+
+    - ParseError:
+        description: >
+          Emitted when parsing fails (malformed HTML, corrupted PDF, OCR
+          failure, unsupported encoding).
+        schema: events/parse_error.json
+
+    - ExtractionEvent:
+        description: >
+          Emitted for each significant extracted entity chunk (person mention,
+          institution, publication reference) to feed the resolver-agent.
+        schema: events/extraction_event.json
+
+# ---------------------------------------------------------------------------
+# Configuration
+# ---------------------------------------------------------------------------
+config:
+  html_parser:
+    engine: "beautifulsoup4+lxml"
+    preserve_elements:
+      - "h1"
+      - "h2"
+      - "h3"
+      - "h4"
+      - "h5"
+      - "h6"
+      - "p"
+      - "ul"
+      - "ol"
+      - "li"
+      - "table"
+      - "thead"
+      - "tbody"
+      - "tr"
+      - "th"
+      - "td"
+      - "caption"
+      - "a"
+      - "img"
+      - "blockquote"
+      - "pre"
+      - "code"
+      - "em"
+      - "strong"
+      - "figure"
+      - "figcaption"
+    remove_selectors:
+      - "script"
+      - "style"
+      - "noscript"
+      - "iframe"
+      - "nav"
+      - "footer"
+      - ".sidebar"
+      - ".advertisement"
+      - ".cookie-banner"
+      - ".social-share"
+      - "#comments"
+      - ".related-posts"
+    unwrap_selectors:
+      - "span"
+      - "div.content"
+      - "article"
+      - "main"
+      - "section"
+
+  pdf_parser:
+    text_engine: "pdfplumber"
+    ocr_engine: "tesseract"
+    ocr_languages: "eng+chi_sim"
+    ocr_dpi: 300
+    layout_detection: true
+    column_detection: true
+    max_pages: 500
+
+  table_extraction:
+    min_rows: 2
+    max_rows: 500
+    detect_merged_cells: true
+    output_formats: ["markdown", "json"]
+    infer_header: true
+
+  metadata_extraction:
+    extract_title: true
+    extract_date: true
+    extract_authors: true
+    extract_abstract: true
+    extract_doi: true
+    extract_keywords: true
+    infer_language: true
+
+  language_detection:
+    model: "fasttext"
+    min_text_length: 100
+    confidence_threshold: 0.7
+
+  content_cleaning:
+    normalize_whitespace: true
+    normalize_unicode: true
+    remove_control_chars: true
+    fix_encoding: true               # Use ftfy for broken encodings
+    max_output_mb: 50
+
+# ---------------------------------------------------------------------------
+# NER & Entity Extraction (inline)
+# ---------------------------------------------------------------------------
+entity_extraction:
+  enabled: true
+  models:
+    person: "spacy_en_core_sci_lg"
+    organization: "spacy_en_core_sci_lg"
+    facility: "regex_patterns"       # Known synchrotron/beamline patterns
+    email: "regex"
+    orcid: "regex"
+    doi: "regex"
+    arxiv_id: "regex"
+
+# ---------------------------------------------------------------------------
+# Resources & Limits
+# ---------------------------------------------------------------------------
+resources:
+  cpu_limit: "4.0"
+  memory_limit_mb: 4096
+  disk_limit_gb: 20
+  gpu_enabled: false
+
+# ---------------------------------------------------------------------------
+# Observability
+# ---------------------------------------------------------------------------
+observability:
+  metrics:
+    - documents_parsed_total
+    - html_parsed_total
+    - pdf_parsed_total
+    - ocr_applied_total
+    - tables_extracted_total
+    - lists_extracted_total
+    - parse_errors_total
+    - parsing_duration_seconds
+    - entities_extracted_total
+  logging:
+    level: info
+    structured: true
+  tracing:
+    enabled: true
+    propagate_context: true
