@@ -41,7 +41,13 @@ export class Neo4jBackupService {
   private readonly backupDir = process.env.NEO4J_BACKUP_DIR ?? '/data/backups/neo4j';
   private readonly neo4jUri = process.env.NEO4J_URI ?? 'bolt://localhost:7687';
   private readonly neo4jUser = process.env.NEO4J_USER ?? 'neo4j';
-  private readonly neo4jPassword = process.env.NEO4J_PASSWORD ?? 'password';
+  private readonly neo4jPassword = (() => {
+    const pw = process.env.NEO4J_PASSWORD;
+    if (!pw || pw === 'password') {
+      console.warn('[SECURITY] NEO4J_PASSWORD not set or using default — set NEO4J_PASSWORD in production');
+    }
+    return pw || 'password';
+  })();
 
   constructor() {
     // 确保备份目录存在

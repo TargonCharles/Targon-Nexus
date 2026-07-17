@@ -79,6 +79,23 @@ const TIER_BONUS: Record<string, number> = {
   'TIER_4_OTHER': 0.02,
 };
 
+/**
+ * 混合语言搜索词处理:
+ *   将 ASCII 单词追加 * 通配符，CJK 片断保持原样。
+ *   "高温 superconductor" → "高温 superconductor*"
+ */
+function buildMixedSearchTerm(term: string): string {
+  return term
+    .split(/\s+/)
+    .map(word => {
+      if (/[\x00-\x7F]+/.test(word) && !/[一-鿿]/.test(word)) {
+        return word.endsWith('*') ? word : `${word}*`;
+      }
+      return word;
+    })
+    .join(' ');
+}
+
 function compositeScore(item: { score?: number; labels?: string[]; subtitle?: string; sourceTier?: string }): number {
   const textScore = item.score ?? 0;
 
@@ -136,10 +153,14 @@ export class SearchService {
     opts: { type?: EntityType; country?: string; field?: string; page?: number; pageSize?: number } = {},
   ): Promise<SearchResponse> {
     const term = query.trim();
-    // Add wildcard suffix for stemming coverage (e.g. "superconductor" → matches "superconductors")
-    // CJK/Unicode 文本不加通配符 (Lucene CJK 分析器不支持 * 前缀)
-    const isAscii = /^[\x00-\x7F\s*]+$/.test(term);
-    const searchTerm = term.endsWith('*') ? term : (isAscii ? `${term}*` : term);
+    // 混合内容搜索优化:
+    //   ASCII 词汇 → 追加 * 通配符 (e.g. "superconductor" → "superconductors")
+    //   CJK 词汇 → 不加通配符 (Lucene CJK 分析器已做 bigram 分词，* 前缀不支持)
+    //   混合输入 (e.g. "高温 superconductor") → ASCII 部分加 *, CJK 部分原样
+    const hasCJK = /[一-鿿㐀-䶿豈-﫿　-〿＀-￯]/.test(term);
+    const searchTerm = term.endsWith('*') ? term
+      : hasCJK ? buildMixedSearchTerm(term)
+      : `${term}*`;
     const { page, pageSize, skip } = paginate(opts, 100);
 
     // Cache key for this search combination

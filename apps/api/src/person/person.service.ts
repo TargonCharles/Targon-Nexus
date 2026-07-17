@@ -3,6 +3,48 @@ import { Neo4jService } from '../neo4j/neo4j.service';
 import { parseArrayProperty, buildGraphFromRows } from '@arp/shared';
 import { EnrichmentService } from './enrichment.service';
 
+// -- 序列化辅助 --------------------------------------------------------------
+
+/** Neo4j Integer / DateTime → 可序列化值 */
+function toMaybeNumber(v: any): number | null {
+  if (v == null) return null;
+  if (typeof v === 'number') return v;
+  if (typeof v.toNumber === 'function') return v.toNumber();
+  return Number(v) || null;
+}
+
+/** Neo4j DateTime → ISO 字符串，保留原始值兜底 */
+function toISO(v: any): string | null {
+  if (v == null) return null;
+  if (typeof v === 'string') return v;
+  if (typeof v.toString === 'function') {
+    const s = v.toString();
+    // Neo4j DateTime.toString() → "2024-03-15T10:30:00.000Z" 或类似格式
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s;
+  }
+  return String(v ?? null);
+}
+
+/** 递归将 Neo4j 原生类型转为 JSON 可序列化的普通值 */
+function serializeRow(row: any): any {
+  if (row === null || row === undefined) return row;
+  if (typeof row !== 'object') return row;
+  if (Array.isArray(row)) return row.map(serializeRow);
+  // Neo4j Integer
+  if (typeof row.toNumber === 'function' && typeof row.toString === 'function' && !('year' in row)) {
+    return row.toNumber();
+  }
+  // Neo4j DateTime (有 year/month/day 等字段的 structured 类型)
+  if (typeof row.year === 'object' && row.year?.low !== undefined) {
+    return toISO(row);
+  }
+  const out: any = {};
+  for (const [k, v] of Object.entries(row)) {
+    out[k] = serializeRow(v);
+  }
+  return out;
+}
+
 @Injectable()
 export class PersonService {
   private readonly logger = new Logger(PersonService.name);
@@ -127,7 +169,7 @@ export class PersonService {
       ORDER BY paper.year DESC, paper.citationCount DESC LIMIT 50
     `;
     const results = await this.neo4j.read<any>(cypher, { uuid });
-    return results.map((row) => ({
+    return results.map((row) => serializeRow({
       ...(row.paper ?? {}),
       title: row.paper?.title || row.paper?.name || '',
       topics: row.topics ?? [],
@@ -140,7 +182,7 @@ export class PersonService {
       RETURN event ORDER BY event.date DESC LIMIT 50
     `;
     const results = await this.neo4j.read<any>(cypher, { uuid });
-    return results.map((row) => row.event ?? {});
+    return results.map((row) => serializeRow(row.event ?? {}));
   }
 
   async getGenealogy(uuid: string) {
@@ -186,25 +228,25 @@ export class PersonService {
     const advisorList = raw.advisorList ?? [];
     const studentList = raw.studentList ?? [];
     return {
-      uuid: p.uuid,
-      internalId: p.internalId,
-      englishName: p.englishName,
-      chineseName: p.chineseName,
-      currentStatus: p.currentStatus,
-      description: p.description,
-      bio: p.bio,
-      education: p.education,
-      title: p.title,
+      uuid: p.uuid ?? null,
+      internalId: p.internalId ?? null,
+      englishName: p.englishName ?? null,
+      chineseName: p.chineseName ?? null,
+      currentStatus: p.currentStatus ?? null,
+      description: p.description ?? null,
+      bio: p.bio ?? null,
+      education: p.education ?? null,
+      title: p.title ?? null,
       researchInterests: parseArrayProperty(p.researchInterests),
       aliases: parseArrayProperty(p.aliases),
-      photoUrl: p.photoUrl,
-      orcid: p.orcid,
-      homepage: p.homepage,
-      hIndex: p.hIndex,
+      photoUrl: p.photoUrl ?? null,
+      orcid: p.orcid ?? null,
+      homepage: p.homepage ?? null,
+      hIndex: p.hIndex ?? null,
       // paperCount: 取属性值与图谱边计数的较大者
       paperCount: Math.max(p.paperCount ?? 0, raw.paperCount ?? 0),
       coauthorCount: raw.coauthorCount ?? 0,
-      citationCount: p.citationCount,
+      citationCount: p.citationCount ?? null,
       // 学术家谱
       advisorCount: raw.advisorCount ?? 0,
       advisorList,
@@ -212,13 +254,13 @@ export class PersonService {
       studentList,
       potentialAdvisors: p.potentialAdvisors ?? [],
       // 职业履历
-      firstPaperYear: p.firstPaperYear?.toNumber?.() ?? p.firstPaperYear,
-      lastPaperYear: p.lastPaperYear?.toNumber?.() ?? p.lastPaperYear,
-      activeYears: p.activeYears?.toNumber?.() ?? p.activeYears,
-      timeline: p.timeline,
+      firstPaperYear: toMaybeNumber(p.firstPaperYear),
+      lastPaperYear: toMaybeNumber(p.lastPaperYear),
+      activeYears: toMaybeNumber(p.activeYears),
+      timeline: p.timeline ?? null,
       // 机构
-      lab: raw.lab ? { uuid: raw.lab.uuid, name: raw.lab.chineseName || raw.lab.englishName || raw.lab.name, englishName: raw.lab.englishName, city: raw.lab.city, country: raw.lab.country, description: raw.lab.description, keywords: raw.lab.keywords } : null,
-      university: univ ? { uuid: univ.uuid, name: univ.name, englishName: univ.englishName, chineseName: univ.chineseName, country: univ.country ?? null } : null,
+      lab: raw.lab ? { uuid: raw.lab.uuid, name: raw.lab.chineseName || raw.lab.englishName || raw.lab.name, englishName: raw.lab.englishName ?? null, city: raw.lab.city ?? null, country: raw.lab.country ?? null, description: raw.lab.description ?? null, keywords: raw.lab.keywords ?? null } : null,
+      university: univ ? { uuid: univ.uuid, name: univ.name ?? null, englishName: univ.englishName ?? null, chineseName: univ.chineseName ?? null, country: univ.country ?? null } : null,
     };
   }
 }

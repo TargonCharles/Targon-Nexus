@@ -16,10 +16,14 @@ export class AuthController {
 
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const jwt = require('jsonwebtoken') as { sign: (...args: any[]) => string };
-    const secret = process.env.JWT_SECRET ?? 'targon-nexus-dev-secret';
+    const secret = process.env.JWT_SECRET;
+    if (!secret || secret === 'targon-nexus-dev-secret') {
+      console.warn('[SECURITY] JWT_SECRET not set or using dev default — set JWT_SECRET in production');
+    }
+    const effectiveSecret = secret || 'targon-nexus-dev-secret';
     const token = jwt.sign(
       { sub: body.username, role: 'admin' },
-      secret,
+      effectiveSecret,
       { algorithm: 'HS256', expiresIn: '7d' },
     );
 

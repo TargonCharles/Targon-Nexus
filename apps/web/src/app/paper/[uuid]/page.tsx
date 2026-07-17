@@ -78,7 +78,7 @@ export default function PaperDetailPage() {
           <div className="mt-4">
             <h3 className="text-sm font-medium text-gray-500 mb-2">作者 ({paper.authors?.length || 0})</h3>
             <div className="flex flex-wrap gap-2">
-              {paper.authors?.map((author, idx) => (
+              {paper.authors?.map((author: any, idx: number) => (
                 <Link
                   key={author.uuid || idx}
                   href={author.uuid ? `/person/${author.uuid}` : '#'}
@@ -101,7 +101,7 @@ export default function PaperDetailPage() {
             <div className="mt-4">
               <h3 className="text-sm font-medium text-gray-500 mb-2">关键词</h3>
               <div className="flex flex-wrap gap-1.5">
-                {paper.keywords.map((kw, i) => (
+                {paper.keywords.map((kw: string, i: number) => (
                   <span key={i} className="px-2 py-0.5 bg-teal-50 text-teal-700 rounded text-xs">
                     {kw}
                   </span>
