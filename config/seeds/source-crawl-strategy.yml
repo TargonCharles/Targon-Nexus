@@ -1,0 +1,208 @@
+# =============================================================================
+# Targon Nexus — 信源爬取策略 & 替代方案
+#
+# 定义每个信源的最佳访问路径:
+#   api     → 优先使用官方 API (结构化数据, 无反爬)
+#   scrape  → 网页抓取 (需 Playwright + 隐身模式 + 代理)
+#   hybrid  → API + 网页抓取互补
+#   skip    → 不可爬取, 使用替代信源
+# =============================================================================
+version: "1.0"
+
+# ---------------------------------------------------------------------------
+# 全局反爬虫配置
+# ---------------------------------------------------------------------------
+antiBot:
+  # 隐身模式 (防止被识别为自动化浏览器)
+  stealth:
+    enabled: true
+    # 隐藏 webdriver 属性
+    hideWebdriver: true
+    # 模拟人类行为: 随机滚动、鼠标移动
+    simulateHuman: true
+    # 随机延迟范围 (ms)
+    randomDelay: [2000, 8000]
+
+  # 请求速率控制 (每个域名)
+  rateLimit:
+    maxConcurrentPerDomain: 2
+    minDelayBetweenRequests: 5000   # ms
+    maxRequestsPerHour: 120
+
+  # User-Agent 轮换
+  userAgentRotation:
+    enabled: true
+    pool:
+      - "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/131.0.0.0 Safari/537.36"
+      - "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_7) Chrome/131.0.0.0 Safari/537.36"
+      - "Mozilla/5.0 (X11; Linux x86_64) Chrome/131.0.0.0 Safari/537.36"
+
+  # 代理配置 (国内大学/知网需要国内IP)
+  proxy:
+    # 国内代理 (访问 .edu.cn / .ac.cn / cnki.net)
+    china:
+      enabled: false  # 部署在国内服务器时不需要
+      http: ""
+      https: ""
+    # 国际代理 (访问 Google Scholar)
+    global:
+      enabled: false
+      http: ""
+      https: ""
+
+  # 重试策略
+  retry:
+    maxAttempts: 3
+    backoffBase: 5000          # ms
+    backoffMultiplier: 2
+    retryOnStatus: [429, 503, 502]
+    # 被封锁时的冷却时间
+    cooldownOnBlock: 600000    # 10 min
+
+# ---------------------------------------------------------------------------
+# 按信源分类的爬取策略
+# ---------------------------------------------------------------------------
+sources:
+  # ===== API 直接访问 (优先) =====
+  "arxiv":
+    strategy: "api"
+    apiEndpoint: "https://export.arxiv.org/api/query"
+    rateLimit: "1 request per 3 seconds"
+    reliability: 0.99
+    notes: "完全免费, 无限制, 官方 API"
+
+  "semantic-scholar":
+    strategy: "api"
+    apiEndpoint: "https://api.semanticscholar.org/graph/v1"
+    rateLimit: "100 requests per 5 minutes (免费)"
+    reliability: 0.99
+    notes: "论文元数据 + 引用网络, 可替代 Google Scholar + CNKI"
+
+  "crossref":
+    strategy: "api"
+    apiEndpoint: "https://api.crossref.org"
+    rateLimit: "50 requests per second (礼貌模式)"
+    reliability: 0.99
+    notes: "DOI 解析 + 期刊元数据 + 引用关系"
+
+  "orcid":
+    strategy: "api"
+    apiEndpoint: "https://pub.orcid.org/v3.0"
+    rateLimit: "24 requests per second"
+    reliability: 0.99
+    notes: "研究者 ORCID 档案: 姓名、机构、发表记录"
+
+  # ===== 网页抓取 (Playwright + 隐身模式) =====
+  "university-edu":
+    strategy: "scrape"
+    engine: "playwright-stealth"
+    typicalUrls:
+      - "{domain}/faculty"
+      - "{domain}/people/faculty"
+      - "{domain}/directory"
+    antiBotLevel: "low"
+    reliability: 0.85
+    notes: "全球 .edu 大学基本无反爬, 部分 faculty 目录需要JS渲染"
+
+  "university-edu-cn":
+    strategy: "scrape"
+    engine: "playwright-stealth"
+    typicalUrls:
+      - "{domain}/szdw.htm"
+      - "{domain}/teacher"
+      - "{domain}/faculty"
+      - "{domain}/xygk/szdw.htm"
+    antiBotLevel: "medium"
+    reliability: 0.75
+    notes: "中国大学偶尔限速, 建议国内服务器部署。部分院校 faculty 页面结构特殊需定制选择器"
+
+  "cas-institute":
+    strategy: "scrape"
+    engine: "playwright-stealth"
+    typicalUrls:
+      - "{domain}/yjly"
+      - "{domain}/research"
+      - "{domain}/team"
+    antiBotLevel: "low"
+    reliability: 0.85
+    notes: "中科院研究所网站较老旧, 多为静态 HTML, 容易抓取"
+
+  "national-lab":
+    strategy: "scrape"
+    engine: "playwright-stealth"
+    antiBotLevel: "low"
+    reliability: 0.80
+    notes: "国家重点实验室页面通常依托大学/中科院域名, 随主站一起抓取"
+
+  # ===== 混合策略 (API + 网页补充) =====
+  "cnki":
+    strategy: "hybrid"
+    primaryPath: "semantic-scholar-api"  # 用 S2 替代获取论文元数据
+    fallbackPath: "cnki-scrape"          # 仅在有机构订阅时抓取摘要
+    antiBotLevel: "extreme"
+    reliability: 0.30  # 网页抓取不可靠
+    notes: "知网需要机构IP+验证码, 论文元数据用 Semantic Scholar 完全可替代。
+            如需中文摘要, 部署在高校IP段内 + API key。"
+
+  "wanfang":
+    strategy: "hybrid"
+    primaryPath: "crossref-api"
+    fallbackPath: "wanfang-scrape"
+    antiBotLevel: "extreme"
+    reliability: 0.30
+
+  "cqvip":
+    strategy: "hybrid"
+    primaryPath: "crossref-api"
+    antiBotLevel: "extreme"
+    reliability: 0.25
+
+  "google-scholar":
+    strategy: "alternative"
+    primaryPath: "semantic-scholar-api"  # S2 完全替代 Google Scholar
+    antiBotLevel: "extreme"
+    reliability: 0.10  # 几乎不可直接抓取
+    notes: "Google Scholar 的反爬虫是业界最强之一, 不建议直接抓取。
+            Semantic Scholar API 提供同等的引用网络和论文元数据。"
+
+  "researchgate":
+    strategy: "scrape"
+    antiBotLevel: "high"
+    reliability: 0.50
+    notes: "仅抓取公开页面 (无需登录的资料), 每次请求间隔 15s+"
+
+  # ===== SCI 期刊 (走 API 而非网页) =====
+  "nature":
+    strategy: "alternative"
+    primaryPath: "crossref-api + semantic-scholar-api"
+    notes: "付费墙, 元数据通过 CrossRef/S2 获取"
+
+  "science":
+    strategy: "alternative"
+    primaryPath: "crossref-api + semantic-scholar-api"
+
+  "aps":
+    strategy: "alternative"
+    primaryPath: "crossref-api + semantic-scholar-api"
+
+  "ieee":
+    strategy: "alternative"
+    primaryPath: "crossref-api + semantic-scholar-api"
+
+  "elsevier":
+    strategy: "alternative"
+    primaryPath: "crossref-api + semantic-scholar-api"
+
+  "springer":
+    strategy: "alternative"
+    primaryPath: "crossref-api + semantic-scholar-api"
+
+# ---------------------------------------------------------------------------
+# 信源优先级: API > Hybrid > Scrape > Alternative > Skip
+# ---------------------------------------------------------------------------
+strategyPriority:
+  - "api"          # 优先: 结构化, 可靠, 快速
+  - "hybrid"       # 混合: API 为主 + 网页补充
+  - "scrape"       # 抓取: 需要隐身 + 延迟
+  - "alternative"  # 替代: 用其他 API 替代高墙源
+  - "skip"         # 放弃: 实在无法获取的信源

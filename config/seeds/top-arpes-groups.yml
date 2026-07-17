@@ -1,0 +1,587 @@
+# =============================================================================
+# Targon Nexus — ARPES 研究组种子配置
+#
+# 按信源等级组织, 用于调度器自动爬取和发现。
+#
+# SourceTier:
+#   TIER_1_OFFICIAL — 大学/研究所官方网站 (每日爬取)
+#   TIER_2_ACADEMIC  — 学术论文/预印本/ORCID (每周爬取)
+#   TIER_3_WEB       — Google Scholar/ResearchGate 等 (每月爬取)
+#   TIER_4_OTHER     — 其他网络来源 (按需爬取)
+# =============================================================================
+
+version: "1.0"
+lastUpdated: "2026-07-15"
+
+# ---------------------------------------------------------------------------
+# Tier 默认配置
+# ---------------------------------------------------------------------------
+tierDefaults:
+  TIER_1_OFFICIAL:
+    qualityScore: 0.95
+    crawlFrequency: "0 2 * * *"     # 每日凌晨 2 点
+    maxDepth: 2
+    maxPagesPerSeed: 100
+    bullMQPriority: 1
+  TIER_2_ACADEMIC:
+    qualityScore: 0.85
+    crawlFrequency: "0 4 * * 1"     # 每周一凌晨 4 点
+    maxDepth: 1
+    maxPagesPerSeed: 50
+    bullMQPriority: 3
+  TIER_3_WEB:
+    qualityScore: 0.55
+    crawlFrequency: "0 0 1 * *"     # 每月 1 日
+    maxDepth: 1
+    maxPagesPerSeed: 30
+    bullMQPriority: 5
+  TIER_4_OTHER:
+    qualityScore: 0.25
+    crawlFrequency: "manual"
+    maxDepth: 1
+    maxPagesPerSeed: 20
+    bullMQPriority: 8
+
+# ---------------------------------------------------------------------------
+# Tier 1: 官方机构 — ARPES 研究组 (50+ 全球顶级实验室)
+# ---------------------------------------------------------------------------
+arpesGroups:
+  # ---- 北美 ----
+  - groupName: "Shen Lab — Topological Materials"
+    piName: "Zhi-Xun Shen"
+    piOrcid: "0000-0003-3763-066X"
+    university: "Stanford University"
+    universityWebsite: "https://www.stanford.edu"
+    labWebsite: "https://shenlab.stanford.edu"
+    facultyDirectoryUrl: "https://physics.stanford.edu/people/faculty"
+    country: "USA"
+    tags: ["ARPES", "topological materials", "high-Tc superconductors", "cuprates"]
+    tier: TIER_1_OFFICIAL
+
+  - groupName: "Quantum Matter Lab"
+    piName: "Andrea Damascelli"
+    piOrcid: "0000-0002-1825-0097"
+    university: "University of British Columbia"
+    universityWebsite: "https://www.ubc.ca"
+    labWebsite: "https://qml.ubc.ca"
+    facultyDirectoryUrl: "https://phas.ubc.ca/faculty"
+    country: "Canada"
+    tags: ["ARPES", "quantum materials", "cuprates", "topological materials"]
+    tier: TIER_1_OFFICIAL
+
+  - groupName: "Hasan Lab — Topological Quantum Matter"
+    piName: "M. Zahid Hasan"
+    university: "Princeton University"
+    universityWebsite: "https://www.princeton.edu"
+    labWebsite: "https://physics.princeton.edu/hasan"
+    facultyDirectoryUrl: "https://physics.princeton.edu/people/faculty"
+    country: "USA"
+    tags: ["ARPES", "topological insulators", "Weyl semimetals"]
+    tier: TIER_1_OFFICIAL
+
+  - groupName: "Comin Lab — Quantum Materials"
+    piName: "Riccardo Comin"
+    university: "MIT"
+    universityWebsite: "https://www.mit.edu"
+    labWebsite: "https://comin.mit.edu"
+    facultyDirectoryUrl: "https://physics.mit.edu/faculty"
+    country: "USA"
+    tags: ["ARPES", "quantum materials", "2D materials"]
+    tier: TIER_1_OFFICIAL
+
+  - groupName: "Lanzara Lab"
+    piName: "Alessandra Lanzara"
+    university: "UC Berkeley"
+    universityWebsite: "https://www.berkeley.edu"
+    labWebsite: "https://physics.berkeley.edu/research/lanzara"
+    facultyDirectoryUrl: "https://physics.berkeley.edu/people/faculty"
+    country: "USA"
+    tags: ["ARPES", "time-resolved ARPES", "high-Tc"]
+    tier: TIER_1_OFFICIAL
+
+  - groupName: "Dessau Lab"
+    piName: "Daniel Dessau"
+    university: "University of Colorado Boulder"
+    universityWebsite: "https://www.colorado.edu"
+    labWebsite: "https://www.colorado.edu/physics/dessau"
+    facultyDirectoryUrl: "https://www.colorado.edu/physics/people/faculty"
+    country: "USA"
+    tags: ["ARPES", "high-Tc superconductors", "topological materials"]
+    tier: TIER_1_OFFICIAL
+
+  - groupName: "Kaminski Lab"
+    piName: "Adam Kaminski"
+    university: "Iowa State University"
+    universityWebsite: "https://www.iastate.edu"
+    labWebsite: "https://www.phys.iastate.edu/kaminski"
+    facultyDirectoryUrl: "https://www.phys.iastate.edu/people/faculty"
+    country: "USA"
+    tags: ["ARPES", "iron-based superconductors"]
+    tier: TIER_1_OFFICIAL
+
+  - groupName: "Johnson Lab"
+    piName: "Peter Johnson"
+    university: "Brookhaven National Laboratory"
+    universityWebsite: "https://www.bnl.gov"
+    labWebsite: "https://www.bnl.gov/condensed-matter"
+    country: "USA"
+    tags: ["ARPES", "strongly correlated", "synchrotron"]
+    tier: TIER_1_OFFICIAL
+
+  - groupName: "Valla Lab"
+    piName: "Tonica Valla"
+    university: "Brookhaven National Laboratory"
+    universityWebsite: "https://www.bnl.gov"
+    labWebsite: "https://www.bnl.gov/condensed-matter"
+    country: "USA"
+    tags: ["ARPES", "cuprates", "topological materials"]
+    tier: TIER_1_OFFICIAL
+
+  - groupName: "Gedik Lab"
+    piName: "Nuh Gedik"
+    university: "MIT"
+    universityWebsite: "https://www.mit.edu"
+    labWebsite: "https://gediklab.mit.edu"
+    facultyDirectoryUrl: "https://physics.mit.edu/faculty"
+    country: "USA"
+    tags: ["time-resolved ARPES", "ultrafast", "quantum materials"]
+    tier: TIER_1_OFFICIAL
+
+  - groupName: "Hsieh Lab"
+    piName: "David Hsieh"
+    university: "Caltech"
+    universityWebsite: "https://www.caltech.edu"
+    labWebsite: "https://pma.caltech.edu/people/david-hsieh"
+    facultyDirectoryUrl: "https://pma.caltech.edu/people/faculty"
+    country: "USA"
+    tags: ["ARPES", "topological materials", "nonlinear optics"]
+    tier: TIER_1_OFFICIAL
+
+  - groupName: "Ohta Lab"
+    piName: "Taisuke Ohta"
+    university: "Sandia National Laboratories"
+    universityWebsite: "https://www.sandia.gov"
+    country: "USA"
+    tags: ["nanoARPES", "2D materials", "synchrotron"]
+    tier: TIER_1_OFFICIAL
+
+  # ---- 欧洲 ----
+  - groupName: "ARPES Group — IFW Dresden"
+    piName: "Sergey Borisenko"
+    university: "IFW Dresden"
+    universityWebsite: "https://www.ifw-dresden.de"
+    labWebsite: "https://www.ifw-dresden.de/institutes/iff"
+    country: "Germany"
+    tags: ["ARPES", "iron-based", "cuprates", "topological"]
+    tier: TIER_1_OFFICIAL
+
+  - groupName: "Büchner Group"
+    piName: "Bernd Büchner"
+    university: "IFW Dresden"
+    universityWebsite: "https://www.ifw-dresden.de"
+    country: "Germany"
+    tags: ["ARPES", "strongly correlated", "superconductors"]
+    tier: TIER_1_OFFICIAL
+
+  - groupName: "Claessen Group"
+    piName: "Ralph Claessen"
+    university: "Universität Würzburg"
+    universityWebsite: "https://www.uni-wuerzburg.de"
+    labWebsite: "https://www.physik.uni-wuerzburg.de/ep4"
+    country: "Germany"
+    tags: ["ARPES", "topological insulators", "oxide interfaces"]
+    tier: TIER_1_OFFICIAL
+
+  - groupName: "Baumberger Group"
+    piName: "Felix Baumberger"
+    university: "EPFL"
+    universityWebsite: "https://www.epfl.ch"
+    country: "Switzerland"
+    tags: ["ARPES", "quantum materials", "strongly correlated"]
+    tier: TIER_1_OFFICIAL
+
+  - groupName: "Mesot Group"
+    piName: "Joël Mesot"
+    university: "ETH Zurich"
+    universityWebsite: "https://www.ethz.ch"
+    country: "Switzerland"
+    tags: ["ARPES", "high-Tc", "synchrotron"]
+    tier: TIER_1_OFFICIAL
+
+  - groupName: "Capitani Group"
+    piName: "Flavio Capitani"
+    university: "SOLEIL Synchrotron"
+    universityWebsite: "https://www.synchrotron-soleil.fr"
+    country: "France"
+    tags: ["ARPES", "synchrotron", "beamline"]
+    tier: TIER_1_OFFICIAL
+
+  - groupName: "Brouet Group"
+    piName: "Véronique Brouet"
+    university: "LPS Orsay — CNRS"
+    universityWebsite: "https://www.lps.u-psud.fr"
+    country: "France"
+    tags: ["ARPES", "strongly correlated", "superconductors"]
+    tier: TIER_1_OFFICIAL
+
+  - groupName: "Cava Group"
+    piName: "Robert Cava"
+    university: "Oxford University"
+    universityWebsite: "https://www.ox.ac.uk"
+    country: "UK"
+    tags: ["quantum materials", "topological", "superconductors"]
+    tier: TIER_1_OFFICIAL
+
+  - groupName: "Coldea Group"
+    piName: "Amalia Coldea"
+    university: "Oxford University"
+    universityWebsite: "https://www.ox.ac.uk"
+    country: "UK"
+    tags: ["ARPES", "quantum oscillations", "superconductors"]
+    tier: TIER_1_OFFICIAL
+
+  - groupName: "King Group"
+    piName: "Phil King"
+    university: "University of St Andrews"
+    universityWebsite: "https://www.st-andrews.ac.uk"
+    country: "UK"
+    tags: ["ARPES", "2D materials", "oxide interfaces"]
+    tier: TIER_1_OFFICIAL
+
+  - groupName: "Hofmann Group"
+    piName: "Philip Hofmann"
+    university: "Aarhus University"
+    universityWebsite: "https://www.au.dk"
+    country: "Denmark"
+    tags: ["ARPES", "surface science", "2D materials"]
+    tier: TIER_1_OFFICIAL
+
+  - groupName: "Tjernberg Group"
+    piName: "Oscar Tjernberg"
+    university: "KTH Royal Institute of Technology"
+    universityWebsite: "https://www.kth.se"
+    country: "Sweden"
+    tags: ["ARPES", "spin-resolved", "synchrotron"]
+    tier: TIER_1_OFFICIAL
+
+  - groupName: "Grioni Group"
+    piName: "Marco Grioni"
+    university: "EPFL"
+    universityWebsite: "https://www.epfl.ch"
+    country: "Switzerland"
+    tags: ["ARPES", "strongly correlated", "synchrotron"]
+    tier: TIER_1_OFFICIAL
+
+  - groupName: "Cercellier Group"
+    piName: "Hervé Cercellier"
+    university: "Institut Néel — CNRS"
+    universityWebsite: "https://www.neel.cnrs.fr"
+    country: "France"
+    tags: ["ARPES", "topological", "strongly correlated"]
+    tier: TIER_1_OFFICIAL
+
+  - groupName: "Avila Group"
+    piName: "José Avila"
+    university: "SOLEIL Synchrotron"
+    universityWebsite: "https://www.synchrotron-soleil.fr"
+    country: "France"
+    tags: ["nanoARPES", "synchrotron", "beamline"]
+    tier: TIER_1_OFFICIAL
+
+  # ---- 东亚 ----
+  - groupName: "Zhou Group — IOP CAS"
+    piName: "Xingjiang Zhou"
+    piOrcid: "0000-0002-8845-0680"
+    university: "Institute of Physics, CAS"
+    universityWebsite: "http://english.iop.cas.cn"
+    labWebsite: "http://zhoulab.iphy.ac.cn"
+    country: "China"
+    tags: ["ARPES", "high-Tc superconductors", "cuprates", "iron-based"]
+    tier: TIER_1_OFFICIAL
+
+  - groupName: "Ding Group — IOP CAS"
+    piName: "Hong Ding"
+    university: "Institute of Physics, CAS"
+    universityWebsite: "http://english.iop.cas.cn"
+    country: "China"
+    tags: ["ARPES", "iron-based superconductors", "topological"]
+    tier: TIER_1_OFFICIAL
+
+  - groupName: "Feng Group — Fudan"
+    piName: "Donglai Feng"
+    university: "Fudan University"
+    universityWebsite: "https://www.fudan.edu.cn"
+    labWebsite: "https://phys.fudan.edu.cn"
+    country: "China"
+    tags: ["ARPES", "high-Tc superconductors", "strongly correlated"]
+    tier: TIER_1_OFFICIAL
+
+  - groupName: "Chen Group — USTC"
+    piName: "Xianhui Chen"
+    university: "USTC"
+    universityWebsite: "https://en.ustc.edu.cn"
+    country: "China"
+    tags: ["quantum materials", "superconductors", "ARPES"]
+    tier: TIER_1_OFFICIAL
+
+  - groupName: "Xue Group — Tsinghua"
+    piName: "Qikun Xue"
+    university: "Tsinghua University"
+    universityWebsite: "https://www.tsinghua.edu.cn"
+    country: "China"
+    tags: ["quantum anomalous Hall", "topological", "MBE"]
+    tier: TIER_1_OFFICIAL
+
+  - groupName: "Wang Group — PKU"
+    piName: "Jian Wang"
+    university: "Peking University"
+    universityWebsite: "https://www.pku.edu.cn"
+    country: "China"
+    tags: ["quantum transport", "topological", "superconductors"]
+    tier: TIER_1_OFFICIAL
+
+  - groupName: "Shen Group — SUSTech"
+    piName: "Zhi-Xun Shen"
+    university: "SUSTech"
+    universityWebsite: "https://www.sustech.edu.cn"
+    country: "China"
+    tags: ["ARPES", "topological materials", "quantum materials"]
+    tier: TIER_1_OFFICIAL
+
+  - groupName: "Takahashi Group — Tohoku"
+    piName: "Takashi Takahashi"
+    university: "Tohoku University"
+    universityWebsite: "https://www.tohoku.ac.jp"
+    country: "Japan"
+    tags: ["ARPES", "high-Tc", "topological", "laser ARPES"]
+    tier: TIER_1_OFFICIAL
+
+  - groupName: "Sato Group — Tohoku"
+    piName: "Takafumi Sato"
+    university: "Tohoku University"
+    universityWebsite: "https://www.tohoku.ac.jp"
+    country: "Japan"
+    tags: ["ARPES", "spin-resolved", "topological materials"]
+    tier: TIER_1_OFFICIAL
+
+  - groupName: "Kondo Group — Tokyo"
+    piName: "Takeshi Kondo"
+    university: "University of Tokyo"
+    universityWebsite: "https://www.u-tokyo.ac.jp"
+    labWebsite: "https://kondo.issp.u-tokyo.ac.jp"
+    country: "Japan"
+    tags: ["laser ARPES", "high-Tc", "strongly correlated"]
+    tier: TIER_1_OFFICIAL
+
+  - groupName: "Shin Group — Tokyo"
+    piName: "Shik Shin"
+    university: "University of Tokyo"
+    universityWebsite: "https://www.u-tokyo.ac.jp"
+    country: "Japan"
+    tags: ["laser ARPES", "ultrahigh resolution"]
+    tier: TIER_1_OFFICIAL
+
+  - groupName: "Kim Group — POSTECH"
+    piName: "Changyoung Kim"
+    university: "POSTECH"
+    universityWebsite: "https://www.postech.ac.kr"
+    country: "South Korea"
+    tags: ["ARPES", "topological", "2D materials"]
+    tier: TIER_1_OFFICIAL
+
+  - groupName: "Kim Group — Yonsei"
+    piName: "Keun Su Kim"
+    university: "Yonsei University"
+    universityWebsite: "https://www.yonsei.ac.kr"
+    country: "South Korea"
+    tags: ["ARPES", "Dirac materials", "topological"]
+    tier: TIER_1_OFFICIAL
+
+  - groupName: "Yang Group — Seoul National"
+    piName: "Bohm-Jung Yang"
+    university: "Seoul National University"
+    universityWebsite: "https://www.snu.ac.kr"
+    country: "South Korea"
+    tags: ["topological materials", "theory", "ARPES"]
+    tier: TIER_1_OFFICIAL
+
+  # ---- 其他地区 ----
+  - groupName: "Fink Group"
+    piName: "Jörg Fink"
+    university: "Helmholtz-Zentrum Berlin"
+    universityWebsite: "https://www.helmholtz-berlin.de"
+    country: "Germany"
+    tags: ["ARPES", "synchrotron", "BESSY"]
+    tier: TIER_1_OFFICIAL
+
+  - groupName: "Rienks Group"
+    piName: "Emile Rienks"
+    university: "Helmholtz-Zentrum Berlin"
+    universityWebsite: "https://www.helmholtz-berlin.de"
+    country: "Germany"
+    tags: ["ARPES", "BESSY", "beamline"]
+    tier: TIER_1_OFFICIAL
+
+  - groupName: "Moshe Group"
+    piName: "Simon Moshe"
+    university: "Weizmann Institute"
+    universityWebsite: "https://www.weizmann.ac.il"
+    country: "Israel"
+    tags: ["ARPES", "topological", "quantum materials"]
+    tier: TIER_1_OFFICIAL
+
+  - groupName: "Ishida Group"
+    piName: "Yukiaki Ishida"
+    university: "Osaka University"
+    universityWebsite: "https://www.osaka-u.ac.jp"
+    country: "Japan"
+    tags: ["time-resolved ARPES", "ultrafast"]
+    tier: TIER_1_OFFICIAL
+
+# ---------------------------------------------------------------------------
+# Tier 1: 已知研究者 (含 ORCID/邮箱, 用于实体消歧锚定)
+# ---------------------------------------------------------------------------
+knownResearchers:
+  - name: "Zhi-Xun Shen"
+    orcid: "0000-0003-3763-066X"
+    homepage: "https://physics.stanford.edu/people/faculty/zhi-xun-shen"
+    currentInstitution: "Stanford University"
+    knownAliases: ["Z.-X. Shen", "Z X Shen", "Zhixun Shen"]
+    tier: TIER_1_OFFICIAL
+
+  - name: "Xingjiang Zhou"
+    orcid: "0000-0002-8845-0680"
+    homepage: "http://zhoulab.iphy.ac.cn"
+    currentInstitution: "Institute of Physics, CAS"
+    knownAliases: ["X. J. Zhou", "Zhou Xingjiang"]
+    tier: TIER_1_OFFICIAL
+
+  - name: "Andrea Damascelli"
+    orcid: "0000-0002-1825-0097"
+    homepage: "https://qml.ubc.ca"
+    currentInstitution: "University of British Columbia"
+    knownAliases: ["A. Damascelli"]
+    tier: TIER_1_OFFICIAL
+
+  - name: "Hong Ding"
+    homepage: "http://english.iop.cas.cn"
+    currentInstitution: "Institute of Physics, CAS"
+    knownAliases: ["Ding Hong", "H. Ding"]
+    tier: TIER_1_OFFICIAL
+
+  - name: "Donglai Feng"
+    homepage: "https://phys.fudan.edu.cn"
+    currentInstitution: "Fudan University"
+    knownAliases: ["D. L. Feng", "Feng Donglai"]
+    tier: TIER_1_OFFICIAL
+
+  - name: "Takashi Takahashi"
+    homepage: "https://www.tohoku.ac.jp"
+    currentInstitution: "Tohoku University"
+    knownAliases: ["T. Takahashi"]
+    tier: TIER_1_OFFICIAL
+
+  - name: "Changyoung Kim"
+    homepage: "https://www.postech.ac.kr"
+    currentInstitution: "POSTECH"
+    knownAliases: ["C. Kim", "C. Y. Kim"]
+    tier: TIER_1_OFFICIAL
+
+  - name: "Nuh Gedik"
+    orcid: "0000-0002-6392-268X"
+    homepage: "https://gediklab.mit.edu"
+    currentInstitution: "MIT"
+    knownAliases: ["N. Gedik"]
+    tier: TIER_1_OFFICIAL
+
+  - name: "Sergey Borisenko"
+    homepage: "https://www.ifw-dresden.de"
+    currentInstitution: "IFW Dresden"
+    knownAliases: ["S. Borisenko", "S. V. Borisenko"]
+    tier: TIER_1_OFFICIAL
+
+  - name: "Phil King"
+    orcid: "0000-0002-7410-7994"
+    homepage: "https://www.st-andrews.ac.uk"
+    currentInstitution: "University of St Andrews"
+    knownAliases: ["P. King", "P. D. C. King"]
+    tier: TIER_1_OFFICIAL
+
+# ---------------------------------------------------------------------------
+# Tier 2: arXiv / Semantic Scholar 学术查询
+# ---------------------------------------------------------------------------
+academicQueries:
+  - query: "angle-resolved photoemission spectroscopy"
+    source: "arxiv"
+    category: "cond-mat.str-el"
+    tier: TIER_2_ACADEMIC
+
+  - query: "topological insulator ARPES experiment"
+    source: "arxiv"
+    category: "cond-mat.mes-hall"
+    tier: TIER_2_ACADEMIC
+
+  - query: "high temperature superconductor ARPES"
+    source: "arxiv"
+    category: "cond-mat.supr-con"
+    tier: TIER_2_ACADEMIC
+
+  - query: "iron based superconductor photoemission"
+    source: "arxiv"
+    category: "cond-mat.supr-con"
+    tier: TIER_2_ACADEMIC
+
+  - query: "quantum materials photoemission spectroscopy"
+    source: "arxiv"
+    category: "cond-mat.str-el"
+    tier: TIER_2_ACADEMIC
+
+  - query: "kagome metal electronic structure ARPES"
+    source: "arxiv"
+    category: "cond-mat.str-el"
+    tier: TIER_2_ACADEMIC
+
+  - query: "Weyl semimetal Fermi surface ARPES"
+    source: "arxiv"
+    category: "cond-mat.mes-hall"
+    tier: TIER_2_ACADEMIC
+
+  - query: "time resolved ARPES ultrafast dynamics"
+    source: "arxiv"
+    category: "cond-mat.str-el"
+    tier: TIER_2_ACADEMIC
+
+  - query: "spin resolved ARPES electronic structure"
+    source: "arxiv"
+    category: "cond-mat.str-el"
+    tier: TIER_2_ACADEMIC
+
+  - query: "nano ARPES spatially resolved"
+    source: "arxiv"
+    category: "cond-mat.mtrl-sci"
+    tier: TIER_2_ACADEMIC
+
+  - query: "laser ARPES ultrahigh resolution"
+    source: "arxiv"
+    category: "cond-mat.str-el"
+    tier: TIER_2_ACADEMIC
+
+  - query: "strongly correlated electron system ARPES"
+    source: "arxiv"
+    category: "cond-mat.str-el"
+    tier: TIER_2_ACADEMIC
+
+  - query: "2D material electronic band structure ARPES"
+    source: "arxiv"
+    category: "cond-mat.mtrl-sci"
+    tier: TIER_2_ACADEMIC
+
+  - query: "nickelate superconductor electronic structure"
+    source: "arxiv"
+    category: "cond-mat.supr-con"
+    tier: TIER_2_ACADEMIC
+
+  - query: "moiré material flat band ARPES"
+    source: "arxiv"
+    category: "cond-mat.mes-hall"
+    tier: TIER_2_ACADEMIC

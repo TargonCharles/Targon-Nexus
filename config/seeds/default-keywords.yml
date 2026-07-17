@@ -1,0 +1,151 @@
+# =============================================================================
+# Targon Nexus — 通用学术知识图谱 种子配置
+#
+# 根据用户指定的关键词，自动发现并爬取相关研究组、论文、人员。
+# 所有内容按信源等级组织，调度器按等级分配优先级。
+#
+# SourceTier:
+#   TIER_1_OFFICIAL — 大学/研究所官方网站 (每日爬取, priority=1)
+#   TIER_2_ACADEMIC  — 学术论文/预印本/ORCID (每周爬取, priority=3)
+#   TIER_3_WEB       — Google Scholar/ResearchGate 等 (每月爬取, priority=5)
+#   TIER_4_OTHER     — 其他网络来源 (按需爬取, priority=8)
+#
+# 用法:
+#   设置环境变量 SEED_KEYWORDS="quantum computing, CRISPR, ARPES"
+#   调度器将对每个关键词执行: arXiv搜索 → 机构官网发现 → 通用网页爬取
+# =============================================================================
+
+version: "2.0"
+lastUpdated: "2026-07-15"
+
+# ---------------------------------------------------------------------------
+# 一、用户关键词（核心驱动）
+# ---------------------------------------------------------------------------
+# 环境变量 SEED_KEYWORDS 可以覆盖此列表
+keywords:
+  - "angle-resolved photoemission spectroscopy"
+  - "topological materials"
+  - "high temperature superconductivity"
+  - "quantum computing"
+  - "CRISPR gene editing"
+
+# ---------------------------------------------------------------------------
+# 二、Tier 默认配置（所有关键词通用）
+# ---------------------------------------------------------------------------
+tierDefaults:
+  TIER_1_OFFICIAL:
+    qualityScore: 0.95
+    crawlFrequency: "0 2 * * *"
+    maxDepth: 2
+    maxPagesPerSeed: 100
+    bullMQPriority: 1
+    description: "大学/研究所官方网站 → 人员信息最权威"
+  TIER_2_ACADEMIC:
+    qualityScore: 0.85
+    crawlFrequency: "0 4 * * 1"
+    maxDepth: 1
+    maxPagesPerSeed: 50
+    bullMQPriority: 3
+    description: "arXiv/Semantic Scholar/ORCID → 论文和引用网络"
+  TIER_3_WEB:
+    qualityScore: 0.55
+    crawlFrequency: "0 0 1 * *"
+    maxDepth: 1
+    maxPagesPerSeed: 30
+    bullMQPriority: 5
+    description: "Google Scholar/ResearchGate/通用搜索"
+  TIER_4_OTHER:
+    qualityScore: 0.25
+    crawlFrequency: "manual"
+    maxDepth: 1
+    maxPagesPerSeed: 20
+    bullMQPriority: 8
+    description: "按需手动触发"
+
+# ---------------------------------------------------------------------------
+# 三、全球顶级大学域名列表（TIER_1，按关键词自动匹配 faculty 页面）
+# ---------------------------------------------------------------------------
+universityDomains:
+  north-america:
+    - "stanford.edu"
+    - "mit.edu"
+    - "harvard.edu"
+    - "berkeley.edu"
+    - "caltech.edu"
+    - "princeton.edu"
+    - "columbia.edu"
+    - "uchicago.edu"
+    - "yale.edu"
+    - "cornell.edu"
+    - "umich.edu"
+    - "washington.edu"
+    - "utexas.edu"
+    - "ucla.edu"
+    - "ucsd.edu"
+    - "illinois.edu"
+    - "ubc.ca"
+    - "utoronto.ca"
+    - "mcgill.ca"
+  europe:
+    - "cam.ac.uk"
+    - "ox.ac.uk"
+    - "imperial.ac.uk"
+    - "ucl.ac.uk"
+    - "ethz.ch"
+    - "epfl.ch"
+    - "mpg.de"
+    - "cnrs.fr"
+    - "ens.fr"
+    - "kth.se"
+    - "ku.dk"
+    - "tum.de"
+    - "lmu.de"
+    - "uni-heidelberg.de"
+  east-asia:
+    - "pku.edu.cn"
+    - "tsinghua.edu.cn"
+    - "ustc.edu.cn"
+    - "fudan.edu.cn"
+    - "nju.edu.cn"
+    - "zju.edu.cn"
+    - "u-tokyo.ac.jp"
+    - "kyoto-u.ac.jp"
+    - "tohoku.ac.jp"
+    - "osaka-u.ac.jp"
+    - "snu.ac.kr"
+    - "postech.ac.kr"
+    - "kaist.ac.kr"
+    - "nus.edu.sg"
+  oceania:
+    - "unimelb.edu.au"
+    - "sydney.edu.au"
+    - "anu.edu.au"
+
+# ---------------------------------------------------------------------------
+# 四、已知研究者（可选 — 用于实体消歧锚定和 ORCID 匹配）
+# ---------------------------------------------------------------------------
+# 这些是种子数据中的高质量锚点。新增研究者会在爬取过程中自动发现。
+knownResearchers:
+  - name: "Zhi-Xun Shen"
+    orcid: "0000-0003-3763-066X"
+    currentInstitution: "Stanford University"
+    knownAliases: ["Z.-X. Shen", "Z X Shen", "Zhixun Shen"]
+    tier: TIER_1_OFFICIAL
+
+  - name: "Xingjiang Zhou"
+    orcid: "0000-0002-8845-0680"
+    currentInstitution: "Institute of Physics, CAS"
+    knownAliases: ["X. J. Zhou", "Zhou Xingjiang"]
+    tier: TIER_1_OFFICIAL
+
+  - name: "Andrea Damascelli"
+    orcid: "0000-0002-1825-0097"
+    currentInstitution: "University of British Columbia"
+    tier: TIER_1_OFFICIAL
+
+# ---------------------------------------------------------------------------
+# 五、初始种子研究组（可选 — 为已知领域提供冷启动加速）
+# ---------------------------------------------------------------------------
+# 如果关键词匹配，这些组的官网将被加入 TIER_1 爬取队列。
+# 留空则完全依赖自动发现。
+researchGroups: []

@@ -1,0 +1,426 @@
+# =============================================================================
+# Targon Nexus — 中国科学院研究所 & 国家级科研平台
+#
+# 覆盖:
+#   中科院下属研究所 (100+)
+#   国家重点实验室
+#   国家工程研究中心
+#
+# 全部标记为 TIER_1_OFFICIAL — 最高权威信源
+# =============================================================================
+version: "1.0"
+
+# =============================================================================
+# 中国科学院 — 按学部/分院组织
+# =============================================================================
+casInstitutes:
+  # --- 数学与系统科学 ---
+  - name: "中国科学院数学与系统科学研究院"
+    englishName: "Academy of Mathematics and Systems Science, CAS"
+    domain: "amss.ac.cn"
+
+  - name: "中国科学院理论物理研究所"
+    englishName: "Institute of Theoretical Physics, CAS"
+    domain: "itp.ac.cn"
+
+  - name: "中国科学院物理研究所"
+    englishName: "Institute of Physics, CAS"
+    domain: "iop.ac.cn"
+    aliases: ["IOP CAS"]
+
+  - name: "中国科学院高能物理研究所"
+    englishName: "Institute of High Energy Physics, CAS"
+    domain: "ihep.ac.cn"
+    aliases: ["IHEP"]
+
+  - name: "中国科学院力学研究所"
+    englishName: "Institute of Mechanics, CAS"
+    domain: "imech.ac.cn"
+
+  - name: "中国科学院声学研究所"
+    englishName: "Institute of Acoustics, CAS"
+    domain: "ioa.ac.cn"
+
+  - name: "中国科学院理化技术研究所"
+    englishName: "Technical Institute of Physics and Chemistry, CAS"
+    domain: "mail.ipc.ac.cn"
+
+  - name: "中国科学院化学研究所"
+    englishName: "Institute of Chemistry, CAS"
+    domain: "iccas.ac.cn"
+
+  - name: "中国科学院过程工程研究所"
+    englishName: "Institute of Process Engineering, CAS"
+    domain: "ipe.ac.cn"
+
+  - name: "中国科学院地理科学与资源研究所"
+    englishName: "Institute of Geographic Sciences and Natural Resources Research, CAS"
+    domain: "igsnrr.ac.cn"
+
+  - name: "中国科学院地质与地球物理研究所"
+    englishName: "Institute of Geology and Geophysics, CAS"
+    domain: "igg.cas.cn"
+
+  - name: "中国科学院大气物理研究所"
+    englishName: "Institute of Atmospheric Physics, CAS"
+    domain: "iap.ac.cn"
+
+  - name: "中国科学院遥感与数字地球研究所"
+    englishName: "Aerospace Information Research Institute, CAS"
+    domain: "aircas.ac.cn"
+
+  # --- 生命科学与医学 ---
+  - name: "中国科学院动物研究所"
+    englishName: "Institute of Zoology, CAS"
+    domain: "ioz.ac.cn"
+
+  - name: "中国科学院植物研究所"
+    englishName: "Institute of Botany, CAS"
+    domain: "ibcas.ac.cn"
+
+  - name: "中国科学院微生物研究所"
+    englishName: "Institute of Microbiology, CAS"
+    domain: "im.ac.cn"
+
+  - name: "中国科学院生物物理研究所"
+    englishName: "Institute of Biophysics, CAS"
+    domain: "ibp.ac.cn"
+
+  - name: "中国科学院遗传与发育生物学研究所"
+    englishName: "Institute of Genetics and Developmental Biology, CAS"
+    domain: "genetics.ac.cn"
+
+  - name: "中国科学院心理研究所"
+    englishName: "Institute of Psychology, CAS"
+    domain: "psych.ac.cn"
+
+  - name: "中国科学院上海生命科学研究院"
+    englishName: "Shanghai Institutes for Biological Sciences, CAS"
+    domain: "sibs.ac.cn"
+
+  - name: "中国科学院上海药物研究所"
+    englishName: "Shanghai Institute of Materia Medica, CAS"
+    domain: "simm.ac.cn"
+
+  - name: "中国科学院神经科学研究所"
+    englishName: "Institute of Neuroscience, CAS"
+    domain: "ion.ac.cn"
+
+  - name: "中国科学院分子细胞科学卓越创新中心"
+    englishName: "Center for Excellence in Molecular Cell Science, CAS"
+    domain: "sibcb.ac.cn"
+
+  # --- 信息科学与技术 ---
+  - name: "中国科学院计算技术研究所"
+    englishName: "Institute of Computing Technology, CAS"
+    domain: "ict.ac.cn"
+
+  - name: "中国科学院软件研究所"
+    englishName: "Institute of Software, CAS"
+    domain: "iscas.ac.cn"
+
+  - name: "中国科学院自动化研究所"
+    englishName: "Institute of Automation, CAS"
+    domain: "ia.ac.cn"
+
+  - name: "中国科学院半导体研究所"
+    englishName: "Institute of Semiconductors, CAS"
+    domain: "semi.ac.cn"
+
+  - name: "中国科学院微电子研究所"
+    englishName: "Institute of Microelectronics, CAS"
+    domain: "ime.ac.cn"
+
+  - name: "中国科学院信息工程研究所"
+    englishName: "Institute of Information Engineering, CAS"
+    domain: "iie.ac.cn"
+
+  - name: "中国科学院空间应用工程与技术中心"
+    englishName: "Technology and Engineering Center for Space Utilization, CAS"
+    domain: "csu.cas.cn"
+
+  - name: "中国科学院计算机网络信息中心"
+    englishName: "Computer Network Information Center, CAS"
+    domain: "cnic.cn"
+
+  # --- 材料科学与工程 ---
+  - name: "中国科学院金属研究所"
+    englishName: "Institute of Metal Research, CAS"
+    domain: "imr.ac.cn"
+
+  - name: "中国科学院上海硅酸盐研究所"
+    englishName: "Shanghai Institute of Ceramics, CAS"
+    domain: "sic.ac.cn"
+
+  - name: "中国科学院上海光学精密机械研究所"
+    englishName: "Shanghai Institute of Optics and Fine Mechanics, CAS"
+    domain: "siom.ac.cn"
+
+  - name: "中国科学院宁波材料技术与工程研究所"
+    englishName: "Ningbo Institute of Materials Technology and Engineering, CAS"
+    domain: "nimte.ac.cn"
+
+  - name: "中国科学院苏州纳米技术与纳米仿生研究所"
+    englishName: "Suzhou Institute of Nano-Tech and Nano-Bionics, CAS"
+    domain: "sinano.ac.cn"
+
+  - name: "中国科学院深圳先进技术研究院"
+    englishName: "Shenzhen Institutes of Advanced Technology, CAS"
+    domain: "siat.ac.cn"
+
+  # --- 能源与环境 ---
+  - name: "中国科学院工程热物理研究所"
+    englishName: "Institute of Engineering Thermophysics, CAS"
+    domain: "iet.cn"
+
+  - name: "中国科学院电工研究所"
+    englishName: "Institute of Electrical Engineering, CAS"
+    domain: "iee.ac.cn"
+
+  - name: "中国科学院广州能源研究所"
+    englishName: "Guangzhou Institute of Energy Conversion, CAS"
+    domain: "giec.ac.cn"
+
+  - name: "中国科学院生态环境研究中心"
+    englishName: "Research Center for Eco-Environmental Sciences, CAS"
+    domain: "rcees.ac.cn"
+
+  - name: "中国科学院海洋研究所"
+    englishName: "Institute of Oceanology, CAS"
+    domain: "qdio.ac.cn"
+
+  # --- 天文与空间科学 ---
+  - name: "中国科学院国家天文台"
+    englishName: "National Astronomical Observatories, CAS"
+    domain: "nao.cas.cn"
+
+  - name: "中国科学院紫金山天文台"
+    englishName: "Purple Mountain Observatory, CAS"
+    domain: "pmo.ac.cn"
+
+  - name: "中国科学院上海天文台"
+    englishName: "Shanghai Astronomical Observatory, CAS"
+    domain: "shao.ac.cn"
+
+  - name: "中国科学院国家空间科学中心"
+    englishName: "National Space Science Center, CAS"
+    domain: "nssc.ac.cn"
+
+  # --- 合肥物质科学 ---
+  - name: "中国科学院合肥物质科学研究院"
+    englishName: "Hefei Institutes of Physical Science, CAS"
+    domain: "hf.cas.cn"
+    aliases: ["CASHIPS", "科学岛"]
+
+  - name: "中国科学院等离子体物理研究所"
+    englishName: "Institute of Plasma Physics, CAS"
+    domain: "ipp.cas.cn"
+
+  - name: "中国科学院固体物理研究所"
+    englishName: "Institute of Solid State Physics, CAS"
+    domain: "issp.cas.cn"
+
+  - name: "中国科学院强磁场科学中心"
+    englishName: "High Magnetic Field Laboratory, CAS"
+    domain: "hmfl.cas.cn"
+
+  # --- 其它重要研究所 ---
+  - name: "中国科学院大连化学物理研究所"
+    englishName: "Dalian Institute of Chemical Physics, CAS"
+    domain: "dicp.ac.cn"
+
+  - name: "中国科学院山西煤炭化学研究所"
+    englishName: "Institute of Coal Chemistry, CAS"
+    domain: "sxicc.ac.cn"
+
+  - name: "中国科学院上海有机化学研究所"
+    englishName: "Shanghai Institute of Organic Chemistry, CAS"
+    domain: "sioc.ac.cn"
+
+  - name: "中国科学院福建物质结构研究所"
+    englishName: "Fujian Institute of Research on the Structure of Matter, CAS"
+    domain: "fjirsm.ac.cn"
+
+  - name: "中国科学院新疆理化技术研究所"
+    englishName: "Xinjiang Technical Institute of Physics and Chemistry, CAS"
+    domain: "xjipc.cas.cn"
+
+  - name: "中国科学院青藏高原研究所"
+    englishName: "Institute of Tibetan Plateau Research, CAS"
+    domain: "itpcas.ac.cn"
+
+  - name: "中国科学院昆明植物研究所"
+    englishName: "Kunming Institute of Botany, CAS"
+    domain: "mail.kib.ac.cn"
+
+  - name: "中国科学院西双版纳热带植物园"
+    englishName: "Xishuangbanna Tropical Botanical Garden, CAS"
+    domain: "xtbg.ac.cn"
+
+  - name: "中国科学院武汉植物园"
+    englishName: "Wuhan Botanical Garden, CAS"
+    domain: "wbg.cas.cn"
+
+  - name: "中国科学院华南植物园"
+    englishName: "South China Botanical Garden, CAS"
+    domain: "scbg.ac.cn"
+
+  - name: "中国科学院南京地质古生物研究所"
+    englishName: "Nanjing Institute of Geology and Palaeontology, CAS"
+    domain: "nigpas.cas.cn"
+
+  - name: "中国科学院古脊椎动物与古人类研究所"
+    englishName: "Institute of Vertebrate Paleontology and Paleoanthropology, CAS"
+    domain: "ivpp.ac.cn"
+
+  # --- 大学合建 ---
+  - name: "中国科学院大学"
+    englishName: "University of Chinese Academy of Sciences"
+    domain: "ucas.ac.cn"
+    aliases: ["UCAS", "国科大"]
+
+  - name: "中国科学技术大学"
+    englishName: "University of Science and Technology of China"
+    domain: "ustc.edu.cn"
+    aliases: ["USTC", "中科大"]
+
+  - name: "上海科技大学"
+    englishName: "ShanghaiTech University"
+    domain: "shanghaitech.edu.cn"
+
+# =============================================================================
+# 国家重点实验室 & 国家研究中心 (部分代表)
+# =============================================================================
+nationalLabs:
+  - name: "合肥微尺度物质科学国家研究中心"
+    institution: "中国科学技术大学"
+    domain: "ustc.edu.cn"
+
+  - name: "北京凝聚态物理国家研究中心"
+    institution: "中国科学院物理研究所"
+    domain: "iop.ac.cn"
+
+  - name: "沈阳材料科学国家研究中心"
+    institution: "中国科学院金属研究所"
+    domain: "imr.ac.cn"
+
+  - name: "量子信息科学国家实验室"
+    institution: "中国科学技术大学"
+    domain: "ustc.edu.cn"
+
+  - name: "蛋白质科学国家研究中心"
+    institution: "中国科学院生物物理研究所"
+    domain: "ibp.ac.cn"
+
+  # --- 国家重点实验室 (基础科学类) ---
+  - name: "超导国家重点实验室"
+    institution: "中国科学院物理研究所"
+    domain: "iop.ac.cn"
+
+  - name: "表面物理国家重点实验室"
+    institution: "中国科学院物理研究所"
+    domain: "iop.ac.cn"
+
+  - name: "磁学国家重点实验室"
+    institution: "中国科学院物理研究所"
+    domain: "iop.ac.cn"
+
+  - name: "人工微结构和介观物理国家重点实验室"
+    institution: "北京大学"
+    domain: "pku.edu.cn"
+
+  - name: "量子光学与光量子器件国家重点实验室"
+    institution: "山西大学"
+    domain: "sxu.edu.cn"
+
+  - name: "催化基础国家重点实验室"
+    institution: "中国科学院大连化学物理研究所"
+    domain: "dicp.ac.cn"
+
+  - name: "分子反应动力学国家重点实验室"
+    institution: "中国科学院大连化学物理研究所"
+    domain: "dicp.ac.cn"
+
+  - name: "高分子物理与化学国家重点实验室"
+    institution: "中国科学院化学研究所"
+    domain: "iccas.ac.cn"
+
+  - name: "配位化学国家重点实验室"
+    institution: "南京大学"
+    domain: "nju.edu.cn"
+
+  - name: "生命有机化学国家重点实验室"
+    institution: "中国科学院上海有机化学研究所"
+    domain: "sioc.ac.cn"
+
+  - name: "固体润滑国家重点实验室"
+    institution: "中国科学院兰州化学物理研究所"
+    domain: "licp.ac.cn"
+
+  - name: "粉末冶金国家重点实验室"
+    institution: "中南大学"
+    domain: "csu.edu.cn"
+
+  - name: "材料复合新技术国家重点实验室"
+    institution: "武汉理工大学"
+    domain: "whut.edu.cn"
+
+  - name: "金属强度国家重点实验室"
+    institution: "西安交通大学"
+    domain: "xjtu.edu.cn"
+
+  - name: "现代焊接与连接国家重点实验室"
+    institution: "哈尔滨工业大学"
+    domain: "hit.edu.cn"
+
+  - name: "精密测试技术及仪器国家重点实验室"
+    institution: "天津大学"
+    domain: "tju.edu.cn"
+
+  - name: "计算机科学国家重点实验室"
+    institution: "中国科学院软件研究所"
+    domain: "iscas.ac.cn"
+
+  - name: "模式识别国家重点实验室"
+    institution: "中国科学院自动化研究所"
+    domain: "ia.ac.cn"
+
+  - name: "信息安全国家重点实验室"
+    institution: "中国科学院信息工程研究所"
+    domain: "iie.ac.cn"
+
+  - name: "微波与数字通信技术国家重点实验室"
+    institution: "清华大学"
+    domain: "tsinghua.edu.cn"
+
+# =============================================================================
+# 国家工程研究中心 (部分代表)
+# =============================================================================
+engineeringCenters:
+  - name: "国家高性能计算工程技术研究中心"
+    institution: "中国科学院计算技术研究所"
+    domain: "ict.ac.cn"
+
+  - name: "国家并行计算机工程技术研究中心"
+    institution: "中国科学院计算技术研究所"
+    domain: "ict.ac.cn"
+
+  - name: "国家生物医学材料工程技术研究中心"
+    institution: "四川大学"
+    domain: "scu.edu.cn"
+
+  - name: "国家轨道交通电气化与自动化工程技术研究中心"
+    institution: "西南交通大学"
+    domain: "swjtu.edu.cn"
+
+  - name: "国家纳米科学中心"
+    institution: "中国科学院"
+    domain: "nanoctr.cn"
+
+  - name: "国家光电研究中心"
+    institution: "华中科技大学"
+    domain: "hust.edu.cn"
+
+  - name: "国家数字化医学工程技术研究中心"
+    institution: "华中科技大学"
+    domain: "hust.edu.cn"

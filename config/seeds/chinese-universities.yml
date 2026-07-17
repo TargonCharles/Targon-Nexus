@@ -1,0 +1,610 @@
+# =============================================================================
+# Targon Nexus — 中国高校域名数据库
+#
+# 覆盖:
+#   985 工程 (39所)
+#   211 工程 (112所, 含985)
+#   一本院校 (补充211未覆盖的省属重点)
+#   港澳主要高校
+#
+# 用于: source-scorer.service.ts 自动识别 TIER_1 信源
+# =============================================================================
+version: "1.0"
+
+universities:
+  # ==========================================================================
+  # 985 工程 (39所) — 中国顶尖研究型大学
+  # ==========================================================================
+  "985":
+    - name: "北京大学"
+      englishName: "Peking University"
+      domain: "pku.edu.cn"
+      aliases: ["PKU", "北大"]
+
+    - name: "清华大学"
+      englishName: "Tsinghua University"
+      domain: "tsinghua.edu.cn"
+      aliases: ["THU", "清华"]
+
+    - name: "复旦大学"
+      englishName: "Fudan University"
+      domain: "fudan.edu.cn"
+      aliases: ["复旦"]
+
+    - name: "上海交通大学"
+      englishName: "Shanghai Jiao Tong University"
+      domain: "sjtu.edu.cn"
+      aliases: ["SJTU", "上交"]
+
+    - name: "浙江大学"
+      englishName: "Zhejiang University"
+      domain: "zju.edu.cn"
+      aliases: ["ZJU", "浙大"]
+
+    - name: "中国科学技术大学"
+      englishName: "University of Science and Technology of China"
+      domain: "ustc.edu.cn"
+      aliases: ["USTC", "中科大"]
+
+    - name: "南京大学"
+      englishName: "Nanjing University"
+      domain: "nju.edu.cn"
+      aliases: ["NJU", "南大"]
+
+    - name: "中国人民大学"
+      englishName: "Renmin University of China"
+      domain: "ruc.edu.cn"
+      aliases: ["RUC", "人大"]
+
+    - name: "北京师范大学"
+      englishName: "Beijing Normal University"
+      domain: "bnu.edu.cn"
+      aliases: ["BNU", "北师大"]
+
+    - name: "北京航空航天大学"
+      englishName: "Beihang University"
+      domain: "buaa.edu.cn"
+      aliases: ["BUAA", "北航"]
+
+    - name: "北京理工大学"
+      englishName: "Beijing Institute of Technology"
+      domain: "bit.edu.cn"
+      aliases: ["BIT", "北理工"]
+
+    - name: "中国农业大学"
+      englishName: "China Agricultural University"
+      domain: "cau.edu.cn"
+      aliases: ["CAU", "农大"]
+
+    - name: "哈尔滨工业大学"
+      englishName: "Harbin Institute of Technology"
+      domain: "hit.edu.cn"
+      aliases: ["HIT", "哈工大"]
+
+    - name: "西安交通大学"
+      englishName: "Xi'an Jiaotong University"
+      domain: "xjtu.edu.cn"
+      aliases: ["XJTU", "西交"]
+
+    - name: "西北工业大学"
+      englishName: "Northwestern Polytechnical University"
+      domain: "nwpu.edu.cn"
+      aliases: ["NPU", "西工大"]
+
+    - name: "兰州大学"
+      englishName: "Lanzhou University"
+      domain: "lzu.edu.cn"
+      aliases: ["LZU", "兰大"]
+
+    - name: "武汉大学"
+      englishName: "Wuhan University"
+      domain: "whu.edu.cn"
+      aliases: ["WHU", "武大"]
+
+    - name: "华中科技大学"
+      englishName: "Huazhong University of Science and Technology"
+      domain: "hust.edu.cn"
+      aliases: ["HUST", "华科"]
+
+    - name: "中南大学"
+      englishName: "Central South University"
+      domain: "csu.edu.cn"
+      aliases: ["CSU", "中南"]
+
+    - name: "国防科技大学"
+      englishName: "National University of Defense Technology"
+      domain: "nudt.edu.cn"
+      aliases: ["NUDT", "国防科大"]
+
+    - name: "中山大学"
+      englishName: "Sun Yat-sen University"
+      domain: "sysu.edu.cn"
+      aliases: ["SYSU", "中大"]
+
+    - name: "华南理工大学"
+      englishName: "South China University of Technology"
+      domain: "scut.edu.cn"
+      aliases: ["SCUT", "华工"]
+
+    - name: "四川大学"
+      englishName: "Sichuan University"
+      domain: "scu.edu.cn"
+      aliases: ["SCU", "川大"]
+
+    - name: "电子科技大学"
+      englishName: "University of Electronic Science and Technology of China"
+      domain: "uestc.edu.cn"
+      aliases: ["UESTC", "电子科大"]
+
+    - name: "重庆大学"
+      englishName: "Chongqing University"
+      domain: "cqu.edu.cn"
+      aliases: ["CQU", "重大"]
+
+    - name: "山东大学"
+      englishName: "Shandong University"
+      domain: "sdu.edu.cn"
+      aliases: ["SDU", "山大"]
+
+    - name: "中国海洋大学"
+      englishName: "Ocean University of China"
+      domain: "ouc.edu.cn"
+      aliases: ["OUC", "海大"]
+
+    - name: "厦门大学"
+      englishName: "Xiamen University"
+      domain: "xmu.edu.cn"
+      aliases: ["XMU", "厦大"]
+
+    - name: "东南大学"
+      englishName: "Southeast University"
+      domain: "seu.edu.cn"
+      aliases: ["SEU", "东大"]
+
+    - name: "同济大学"
+      englishName: "Tongji University"
+      domain: "tongji.edu.cn"
+      aliases: ["同济"]
+
+    - name: "华东师范大学"
+      englishName: "East China Normal University"
+      domain: "ecnu.edu.cn"
+      aliases: ["ECNU", "华东师大"]
+
+    - name: "南开大学"
+      englishName: "Nankai University"
+      domain: "nankai.edu.cn"
+      aliases: ["NKU", "南开"]
+
+    - name: "天津大学"
+      englishName: "Tianjin University"
+      domain: "tju.edu.cn"
+      aliases: ["TJU", "天大"]
+
+    - name: "大连理工大学"
+      englishName: "Dalian University of Technology"
+      domain: "dlut.edu.cn"
+      aliases: ["DUT", "大工"]
+
+    - name: "东北大学"
+      englishName: "Northeastern University (China)"
+      domain: "neu.edu.cn"
+      aliases: ["NEU", "东大"]
+
+    - name: "吉林大学"
+      englishName: "Jilin University"
+      domain: "jlu.edu.cn"
+      aliases: ["JLU", "吉大"]
+
+    - name: "西北农林科技大学"
+      englishName: "Northwest A&F University"
+      domain: "nwafu.edu.cn"
+      aliases: ["NWAFU", "西农"]
+
+    - name: "中央民族大学"
+      englishName: "Minzu University of China"
+      domain: "muc.edu.cn"
+      aliases: ["MUC", "民大"]
+
+  # ==========================================================================
+  # 211 工程 (补充部分, 共73所不含985)
+  # ==========================================================================
+  "211":
+    - name: "北京交通大学"
+      englishName: "Beijing Jiaotong University"
+      domain: "bjtu.edu.cn"
+      aliases: ["BJTU", "北交"]
+
+    - name: "北京工业大学"
+      englishName: "Beijing University of Technology"
+      domain: "bjut.edu.cn"
+      aliases: ["BJUT", "北工大"]
+
+    - name: "北京科技大学"
+      englishName: "University of Science and Technology Beijing"
+      domain: "ustb.edu.cn"
+      aliases: ["USTB", "北科"]
+
+    - name: "北京化工大学"
+      englishName: "Beijing University of Chemical Technology"
+      domain: "buct.edu.cn"
+      aliases: ["BUCT", "北化"]
+
+    - name: "北京邮电大学"
+      englishName: "Beijing University of Posts and Telecommunications"
+      domain: "bupt.edu.cn"
+      aliases: ["BUPT", "北邮"]
+
+    - name: "北京林业大学"
+      englishName: "Beijing Forestry University"
+      domain: "bjfu.edu.cn"
+      aliases: ["BJFU", "北林"]
+
+    - name: "北京中医药大学"
+      englishName: "Beijing University of Chinese Medicine"
+      domain: "bucm.edu.cn"
+      aliases: ["BUCM", "北中医"]
+
+    - name: "北京外国语大学"
+      englishName: "Beijing Foreign Studies University"
+      domain: "bfsu.edu.cn"
+      aliases: ["BFSU", "北外"]
+
+    - name: "中国传媒大学"
+      englishName: "Communication University of China"
+      domain: "cuc.edu.cn"
+      aliases: ["CUC", "中传"]
+
+    - name: "中央财经大学"
+      englishName: "Central University of Finance and Economics"
+      domain: "cufe.edu.cn"
+      aliases: ["CUFE", "中财"]
+
+    - name: "对外经济贸易大学"
+      englishName: "University of International Business and Economics"
+      domain: "uibe.edu.cn"
+      aliases: ["UIBE", "贸大"]
+
+    - name: "中国政法大学"
+      englishName: "China University of Political Science and Law"
+      domain: "cupl.edu.cn"
+      aliases: ["CUPL", "法大"]
+
+    - name: "华北电力大学"
+      englishName: "North China Electric Power University"
+      domain: "ncepu.edu.cn"
+      aliases: ["NCEPU", "华电"]
+
+    - name: "中国矿业大学(北京)"
+      englishName: "China University of Mining and Technology (Beijing)"
+      domain: "cumtb.edu.cn"
+      aliases: ["CUMTB", "矿大北京"]
+
+    - name: "中国石油大学(北京)"
+      englishName: "China University of Petroleum (Beijing)"
+      domain: "cup.edu.cn"
+      aliases: ["CUP", "石大北京"]
+
+    - name: "中国地质大学(北京)"
+      englishName: "China University of Geosciences (Beijing)"
+      domain: "cugb.edu.cn"
+      aliases: ["CUGB", "地大北京"]
+
+    - name: "上海财经大学"
+      englishName: "Shanghai University of Finance and Economics"
+      domain: "sufe.edu.cn"
+      aliases: ["SUFE", "上财"]
+
+    - name: "上海外国语大学"
+      englishName: "Shanghai International Studies University"
+      domain: "shisu.edu.cn"
+      aliases: ["SISU", "上外"]
+
+    - name: "上海大学"
+      englishName: "Shanghai University"
+      domain: "shu.edu.cn"
+      aliases: ["SHU", "上大"]
+
+    - name: "东华大学"
+      englishName: "Donghua University"
+      domain: "dhu.edu.cn"
+      aliases: ["DHU", "东华"]
+
+    - name: "华东理工大学"
+      englishName: "East China University of Science and Technology"
+      domain: "ecust.edu.cn"
+      aliases: ["ECUST", "华东理工"]
+
+    - name: "苏州大学"
+      englishName: "Soochow University"
+      domain: "suda.edu.cn"
+      aliases: ["SUDA", "苏大"]
+
+    - name: "南京航空航天大学"
+      englishName: "Nanjing University of Aeronautics and Astronautics"
+      domain: "nuaa.edu.cn"
+      aliases: ["NUAA", "南航"]
+
+    - name: "南京理工大学"
+      englishName: "Nanjing University of Science and Technology"
+      domain: "njust.edu.cn"
+      aliases: ["NJUST", "南理工"]
+
+    - name: "中国矿业大学"
+      englishName: "China University of Mining and Technology"
+      domain: "cumt.edu.cn"
+      aliases: ["CUMT", "矿大"]
+
+    - name: "河海大学"
+      englishName: "Hohai University"
+      domain: "hhu.edu.cn"
+      aliases: ["HHU", "河海"]
+
+    - name: "江南大学"
+      englishName: "Jiangnan University"
+      domain: "jiangnan.edu.cn"
+      aliases: ["江大"]
+
+    - name: "南京农业大学"
+      englishName: "Nanjing Agricultural University"
+      domain: "njau.edu.cn"
+      aliases: ["NJAU", "南农"]
+
+    - name: "中国药科大学"
+      englishName: "China Pharmaceutical University"
+      domain: "cpu.edu.cn"
+      aliases: ["CPU", "药大"]
+
+    - name: "南京师范大学"
+      englishName: "Nanjing Normal University"
+      domain: "njnu.edu.cn"
+      aliases: ["NJNU", "南师大"]
+
+    - name: "合肥工业大学"
+      englishName: "Hefei University of Technology"
+      domain: "hfut.edu.cn"
+      aliases: ["HFUT", "合工大"]
+
+    - name: "安徽大学"
+      englishName: "Anhui University"
+      domain: "ahu.edu.cn"
+      aliases: ["AHU", "安大"]
+
+    - name: "福州大学"
+      englishName: "Fuzhou University"
+      domain: "fzu.edu.cn"
+      aliases: ["FZU", "福大"]
+
+    - name: "南昌大学"
+      englishName: "Nanchang University"
+      domain: "ncu.edu.cn"
+      aliases: ["NCU", "昌大"]
+
+    - name: "郑州大学"
+      englishName: "Zhengzhou University"
+      domain: "zzu.edu.cn"
+      aliases: ["ZZU", "郑大"]
+
+    - name: "武汉理工大学"
+      englishName: "Wuhan University of Technology"
+      domain: "whut.edu.cn"
+      aliases: ["WHUT", "武理工"]
+
+    - name: "华中农业大学"
+      englishName: "Huazhong Agricultural University"
+      domain: "hzau.edu.cn"
+      aliases: ["HZAU", "华农"]
+
+    - name: "华中师范大学"
+      englishName: "Central China Normal University"
+      domain: "ccnu.edu.cn"
+      aliases: ["CCNU", "华师"]
+
+    - name: "中南财经政法大学"
+      englishName: "Zhongnan University of Economics and Law"
+      domain: "zuel.edu.cn"
+      aliases: ["ZUEL", "中南大"]
+
+    - name: "湖南大学"
+      englishName: "Hunan University"
+      domain: "hnu.edu.cn"
+      aliases: ["HNU", "湖大"]
+
+    - name: "湖南师范大学"
+      englishName: "Hunan Normal University"
+      domain: "hunnu.edu.cn"
+      aliases: ["HUNNU", "湖南师大"]
+
+    - name: "暨南大学"
+      englishName: "Jinan University"
+      domain: "jnu.edu.cn"
+      aliases: ["JNU", "暨大"]
+
+    - name: "华南师范大学"
+      englishName: "South China Normal University"
+      domain: "scnu.edu.cn"
+      aliases: ["SCNU", "华南师大"]
+
+    - name: "广西大学"
+      englishName: "Guangxi University"
+      domain: "gxu.edu.cn"
+      aliases: ["GXU", "西大"]
+
+    - name: "西南交通大学"
+      englishName: "Southwest Jiaotong University"
+      domain: "swjtu.edu.cn"
+      aliases: ["SWJTU", "西南交大"]
+
+    - name: "西南财经大学"
+      englishName: "Southwestern University of Finance and Economics"
+      domain: "swufe.edu.cn"
+      aliases: ["SWUFE", "西财"]
+
+    - name: "西南大学"
+      englishName: "Southwest University"
+      domain: "swu.edu.cn"
+      aliases: ["SWU", "西南大"]
+
+    - name: "云南大学"
+      englishName: "Yunnan University"
+      domain: "ynu.edu.cn"
+      aliases: ["YNU", "云大"]
+
+    - name: "贵州大学"
+      englishName: "Guizhou University"
+      domain: "gzu.edu.cn"
+      aliases: ["GZU", "贵大"]
+
+    - name: "西北大学"
+      englishName: "Northwest University"
+      domain: "nwu.edu.cn"
+      aliases: ["NWU", "西北大"]
+
+    - name: "西安电子科技大学"
+      englishName: "Xidian University"
+      domain: "xidian.edu.cn"
+      aliases: ["XDU", "西电"]
+
+    - name: "长安大学"
+      englishName: "Chang'an University"
+      domain: "chd.edu.cn"
+      aliases: ["CHD", "长安大"]
+
+    - name: "陕西师范大学"
+      englishName: "Shaanxi Normal University"
+      domain: "snnu.edu.cn"
+      aliases: ["SNNU", "陕西师大"]
+
+    - name: "新疆大学"
+      englishName: "Xinjiang University"
+      domain: "xju.edu.cn"
+      aliases: ["XJU", "新大"]
+
+    - name: "石河子大学"
+      englishName: "Shihezi University"
+      domain: "shzu.edu.cn"
+      aliases: ["SHZU", "石大"]
+
+    - name: "宁夏大学"
+      englishName: "Ningxia University"
+      domain: "nxu.edu.cn"
+      aliases: ["NXU", "宁大"]
+
+    - name: "青海大学"
+      englishName: "Qinghai University"
+      domain: "qhu.edu.cn"
+      aliases: ["QHU", "青大"]
+
+    - name: "内蒙古大学"
+      englishName: "Inner Mongolia University"
+      domain: "imu.edu.cn"
+      aliases: ["IMU", "内大"]
+
+    - name: "辽宁大学"
+      englishName: "Liaoning University"
+      domain: "lnu.edu.cn"
+      aliases: ["LNU", "辽大"]
+
+    - name: "大连海事大学"
+      englishName: "Dalian Maritime University"
+      domain: "dlmu.edu.cn"
+      aliases: ["DLMU", "大连海事"]
+
+    - name: "东北师范大学"
+      englishName: "Northeast Normal University"
+      domain: "nenu.edu.cn"
+      aliases: ["NENU", "东北师大"]
+
+    - name: "东北林业大学"
+      englishName: "Northeast Forestry University"
+      domain: "nefu.edu.cn"
+      aliases: ["NEFU", "东北林大"]
+
+    - name: "东北农业大学"
+      englishName: "Northeast Agricultural University"
+      domain: "neau.edu.cn"
+      aliases: ["NEAU", "东北农大"]
+
+    - name: "哈尔滨工程大学"
+      englishName: "Harbin Engineering University"
+      domain: "hrbeu.edu.cn"
+      aliases: ["HRBEU", "哈工程"]
+
+    - name: "延边大学"
+      englishName: "Yanbian University"
+      domain: "ybu.edu.cn"
+      aliases: ["YBU", "延大"]
+
+    - name: "河北工业大学"
+      englishName: "Hebei University of Technology"
+      domain: "hebut.edu.cn"
+      aliases: ["HEBUT", "河工大"]
+
+    - name: "太原理工大学"
+      englishName: "Taiyuan University of Technology"
+      domain: "tyut.edu.cn"
+      aliases: ["TYUT", "太理工"]
+
+    - name: "海南大学"
+      englishName: "Hainan University"
+      domain: "hainanu.edu.cn"
+      aliases: ["HNU", "海大"]
+
+    - name: "西藏大学"
+      englishName: "Tibet University"
+      domain: "utibet.edu.cn"
+      aliases: ["UTIBET", "藏大"]
+
+    - name: "中国石油大学(华东)"
+      englishName: "China University of Petroleum (East China)"
+      domain: "upc.edu.cn"
+      aliases: ["UPC", "石大华东"]
+
+    - name: "中国地质大学(武汉)"
+      englishName: "China University of Geosciences (Wuhan)"
+      domain: "cug.edu.cn"
+      aliases: ["CUG", "地大武汉"]
+
+    - name: "华北电力大学(保定)"
+      englishName: "North China Electric Power University (Baoding)"
+      domain: "ncepu.edu.cn"
+      aliases: ["华电保定"]
+
+  # ==========================================================================
+  # 港澳主要高校
+  # ==========================================================================
+  hk-mo:
+    - name: "香港大学"
+      englishName: "University of Hong Kong"
+      domain: "hku.hk"
+      aliases: ["HKU", "港大"]
+
+    - name: "香港中文大学"
+      englishName: "Chinese University of Hong Kong"
+      domain: "cuhk.edu.hk"
+      aliases: ["CUHK", "港中文"]
+
+    - name: "香港科技大学"
+      englishName: "Hong Kong University of Science and Technology"
+      domain: "ust.hk"
+      aliases: ["HKUST", "港科"]
+
+    - name: "香港理工大学"
+      englishName: "Hong Kong Polytechnic University"
+      domain: "polyu.edu.hk"
+      aliases: ["PolyU", "理大"]
+
+    - name: "香港城市大学"
+      englishName: "City University of Hong Kong"
+      domain: "cityu.edu.hk"
+      aliases: ["CityU", "城大"]
+
+    - name: "澳门大学"
+      englishName: "University of Macau"
+      domain: "um.edu.mo"
+      aliases: ["UM", "澳大"]
+
+    - name: "澳门科技大学"
+      englishName: "Macau University of Science and Technology"
+      domain: "must.edu.mo"
+      aliases: ["MUST", "澳科大"]
