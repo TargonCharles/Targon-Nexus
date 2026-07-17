@@ -32,6 +32,7 @@ export interface SearchResult {
   uuid: string;
   type: 'person' | 'lab' | 'university' | 'equipment' | 'research_direction' | 'paper';
   name: string;
+  chineseName?: string;
   subtitle?: string;
   labels: string[];
   score?: number;
@@ -101,6 +102,10 @@ export async function getPersonAdvisors(uuid: string) {
 
 export async function getPersonGraph(uuid: string) {
   return fetchApi<GraphData>(`/persons/${uuid}/graph`);
+}
+
+export async function getPersonPapers(uuid: string) {
+  return fetchApi<any[]>(`/persons/${uuid}/papers`);
 }
 
 export async function getPersonGenealogy(uuid: string) {
@@ -196,4 +201,15 @@ export async function getFacilityGraph(uuid: string) {
 export async function listFacilities(country?: string) {
   const query = country ? `?country=${encodeURIComponent(country)}` : '';
   return fetchApi<any[]>(`/facilities${query}`);
+}
+
+// -- 报错机制 — 用户发现错误可提交审核 --
+export async function reportError(entityType: string, uuid: string, description: string) {
+  const res = await fetch(`${API_BASE}/quality/report`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ entityType, uuid, description }),
+  });
+  if (!res.ok) throw new Error('Report failed');
+  return res.json();
 }

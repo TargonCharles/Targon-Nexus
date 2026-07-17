@@ -155,4 +155,16 @@ export class ValidationService {
     );
     return r[0]?.c ?? 0;
   }
+
+  /** 用户报错日志 */
+  async logErrorReport(entityType: string, uuid: string, description: string): Promise<void> {
+    await this.neo4j.write(
+      `MERGE (r:ErrorReport {uuid: randomUUID()})
+       SET r.entityType = $entityType, r.entityUuid = $uuid,
+           r.description = $desc, r.status = 'pending',
+           r.createdAt = datetime()
+       RETURN r.uuid`,
+      { entityType, uuid, desc: description },
+    );
+  }
 }

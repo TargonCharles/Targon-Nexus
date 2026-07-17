@@ -24,6 +24,7 @@ describe('DedupService', () => {
 
   describe('deduplicate', () => {
     it('returns empty when no duplicates found', async () => {
+      // All 5 phases return empty
       neo4j.read.mockResolvedValue([]);
       const result = await service.deduplicate();
       expect(result.count).toBe(0);
@@ -31,21 +32,38 @@ describe('DedupService', () => {
     });
 
     it('merges by ORCID and produces merge records', async () => {
-      // Phase 1: one ORCID dup group, Phase 2-3: empty
+      // Phase 1: ORCID dup, Phase 2-5: empty
       neo4j.read
         .mockResolvedValueOnce([{ orcid: '0000-0002-1825-0097', uuids: ['canonical', 'dup1'] }])
-        .mockResolvedValueOnce([])  // name dups
-        .mockResolvedValueOnce([]); // all people for fuzzy
+        .mockResolvedValueOnce([])  // email dups
+        .mockResolvedValueOnce([])  // name+institution
+        .mockResolvedValueOnce([])  // exact name
+        .mockResolvedValueOnce([]); // fuzzy name
 
       const result = await service.deduplicate();
       expect(result.count).toBe(1);
-      expect(result.merges[0]).toContain('ORCID');
-      expect(result.merges[0]).toContain('canonical');
+      expect(result.merges[0].strategy).toBe('orcid');
+      expect(result.merges[0].keptUUID).toBe('canonical');
+    });
+
+    it('merges by email exact match', async () => {
+      neo4j.read
+        .mockResolvedValueOnce([])  // no ORCID
+        .mockResolvedValueOnce([{ email: 'test@stanford.edu', uuids: ['a', 'b'] }])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]);
+
+      const result = await service.deduplicate();
+      expect(result.count).toBe(1);
+      expect(result.merges[0].strategy).toBe('email');
     });
 
     it('skips known exclusion names in name-phase merge', async () => {
       neo4j.read
-        .mockResolvedValueOnce([])  // no ORCID dups
+        .mockResolvedValueOnce([])  // ORCID
+        .mockResolvedValueOnce([])  // email
+        .mockResolvedValueOnce([])  // name+institution
         .mockResolvedValueOnce([{ name: 'Xingjiang Zhou', uuids: ['a', 'b'] }])
         .mockResolvedValueOnce([]); // fuzzy
 
@@ -57,6 +75,8 @@ describe('DedupService', () => {
       neo4j.read
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
         .mockResolvedValueOnce([
           { uuid: 'a', name: 'Hong Ding' },
           { uuid: 'b', name: 'Ding Hong' },
@@ -64,9 +84,8 @@ describe('DedupService', () => {
         ]);
 
       const result = await service.deduplicate();
-      // "Hong Ding" and "Ding Hong" → same key "ding hong"
       expect(result.count).toBe(1);
-      expect(result.merges[0]).toContain('Fuzzy');
+      expect(result.merges[0].strategy).toBe('fuzzy_name');
     });
   });
 });

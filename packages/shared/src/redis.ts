@@ -21,17 +21,19 @@ export interface RedisConnection {
  * Create a Redis connection with sensible defaults for BullMQ-based
  * microservices. Uses lazy require so the shared package stays zero-dep.
  *
+ * Return type is compatible with BullMQ Queue/Worker connection parameter.
+ *
  * @example
  *   const connection = createRedisConnection();
  *   const myQueue = new Queue('my-queue', { connection });
  */
 export function createRedisConnection(
   opts: RedisConnectionOptions = {},
-): RedisConnection {
+): any {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const Redis = require('ioredis') as {
-    default?: new (url: string, opts?: Record<string, unknown>) => RedisConnection;
-    new (url: string, opts?: Record<string, unknown>): RedisConnection;
+    default?: new (url: string, opts?: Record<string, unknown>) => any;
+    new (url: string, opts?: Record<string, unknown>): any;
   };
 
   const RedisCtor =

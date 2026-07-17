@@ -17,6 +17,7 @@ import { GraphQLApiModule } from './graphql/graphql.module';
 import { VectorModule } from './vector/vector.module';
 import { QualityModule } from './quality/quality.module';
 import { IntegrationModule } from './integration/integration.module';
+import { IdentityModule } from './identity/identity.module';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { IntegrationModule } from './integration/integration.module';
     VectorModule,
     QualityModule,
     IntegrationModule,
+    IdentityModule,
   ],
   providers: [
     {

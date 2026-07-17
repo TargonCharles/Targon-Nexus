@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body } from '@nestjs/common';
 import { Public } from '../auth';
 import { QualityService } from './quality.service';
 import { EvidenceService } from './evidence.service';
@@ -80,5 +80,17 @@ export class QualityController {
   async validate() {
     const report = await this.validationService.validateAll();
     return { success: true, data: report };
+  }
+
+  /** 用户报错 — 提交数据错误供审核 */
+  @Public()
+  @Post('report')
+  async reportError(
+    @Body('entityType') entityType: string,
+    @Body('uuid') uuid: string,
+    @Body('description') description: string,
+  ) {
+    await this.validationService.logErrorReport(entityType, uuid, description);
+    return { success: true, message: '已提交审核' };
   }
 }

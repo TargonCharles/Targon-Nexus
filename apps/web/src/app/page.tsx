@@ -4,17 +4,15 @@ import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 
 const ALL_TAGS = [
-  'ARPES', '角分辨光电子能谱', '拓扑绝缘体', '高温超导', '铁基超导',
-  '量子材料', '重费米子', '电荷密度波', 'Weyl半金属', 'Dirac半金属',
-  '石墨烯', 'TMD', '异质结', '自旋电子学', '强关联体系',
-  'Mott绝缘体', '二维材料', '表面物理', 'Kagome金属', 'Kondo',
-  'ARPES设备', 'Scienta DA30', 'R4000', 'PHOIBOS', '激光ARPES',
-  'MBE', 'STM', 'TEM', 'AFM', 'SEM', 'XRD', 'XPS', 'CVD',
-  '同步辐射', 'SSRF', 'ALS', 'SPring-8', 'Diamond光源', 'BESSY', 'MAX IV',
-  'Stanford', 'MIT', 'Oxford', '沈志勋', '封东来', '周兴江',
-  'Damascelli', 'Lanzara', 'Comin', 'Tokura', 'Takahashi',
-  '复旦大学', '中科院物理所', '东京大学', 'UC Berkeley', 'UBC', 'EPFL',
-  'Nature', 'Science', 'PRL', '引用网络', '学术家谱', '混合搜索',
+  '量子计算', 'AI', '机器学习', '深度学习', '神经网络',
+  'CRISPR', '基因编辑', 'mRNA', '蛋白质结构', '合成生物学',
+  '拓扑材料', '高温超导', '量子材料', '二维材料', '钙钛矿',
+  '碳中和', '固态电池', '氢能', '核聚变', '光伏',
+  '脑机接口', '神经科学', '阿尔茨海默', '免疫治疗', '干细胞',
+  'Stanford', 'MIT', '清华', '北大', '中科院',
+  'Nature', 'Science', 'Cell', 'PRL', 'arXiv',
+  '引力波', '暗物质', '黑洞', '系外行星', 'JWST',
+  '机器人', '自动驾驶', '大语言模型', '知识图谱', '数字孪生',
 ];
 
 function shuffle<T>(arr: T[]): T[] {
@@ -138,7 +136,7 @@ export default function HomePage() {
             AI 驱动的科研关系知识图谱
           </p>
           <p className="text-center text-sm text-white/40 mb-6">
-            探索全球角分辨光电子能谱研究社区
+            输入任意科研关键词，AI 自动发现并构建知识图谱
           </p>
           <form onSubmit={handleSearch} className="relative">
             <input

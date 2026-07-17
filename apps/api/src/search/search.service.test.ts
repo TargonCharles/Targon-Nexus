@@ -15,6 +15,7 @@ describe('SearchService', () => {
     name: 'Zhi-Xun Shen',
     subtitle: 'Professor',
     labels: ['Person'],
+    sourceTier: 'TIER_2_ACADEMIC',
     score: 0.95,
   };
 
@@ -24,6 +25,7 @@ describe('SearchService', () => {
     name: 'ARPES Lab',
     subtitle: 'USA',
     labels: ['Lab'],
+    sourceTier: 'TIER_1_OFFICIAL',
     score: 0.8,
   };
 
@@ -130,9 +132,10 @@ describe('SearchService', () => {
 
       expect(result.total).toBe(0); // count queries return []
       expect(result.items).toHaveLength(2);
-      // Person (0.95) should rank above Lab (0.8)
-      expect(result.items[0].type).toBe('person');
-      expect(result.items[1].type).toBe('lab');
+      // Lab(TIER_1_OFFICIAL, tierBonus=0.25)综合分=0.81 > Person(TIER_2_ACADEMIC, tierBonus=0.15)综合分=0.80
+      // 权威信源(TIER_1)排名优先于低等级信源
+      expect(result.items[0].type).toBe('lab');
+      expect(result.items[1].type).toBe('person');
     });
 
     it('handles page > 1 with merged results', async () => {

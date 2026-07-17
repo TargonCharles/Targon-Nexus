@@ -65,4 +65,11 @@ export class PersonController {
     const data = await this.personService.getGenealogy(uuid);
     return { success: true, data };
   }
+
+  @Get(':uuid/papers')
+  @ApiOperation({ summary: '获取该人物的论文列表' })
+  async getPapers(@Param('uuid') uuid: string) {
+    const data = await this.personService.getPapers(uuid);
+    return { success: true, data };
+  }
 }

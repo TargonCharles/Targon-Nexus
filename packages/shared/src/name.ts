@@ -110,6 +110,95 @@ export function toPinyinArray(name: string): string[] {
   }
 }
 
+// -- 多语言姓名别名生成 ------------------------------------------------
+
+/**
+ * 为英文人名生成所有常见变体
+ * "Zhi-Xun Shen" → ["Zhi-Xun Shen", "Z.-X. Shen", "Z X Shen",
+ *                    "Zhixun Shen", "Shen Zhi-Xun", "Shen Z.-X."]
+ */
+export function generateNameAliases(fullName: string): string[] {
+  if (!fullName || fullName.length < 2) return [fullName];
+  const aliases = new Set<string>();
+  aliases.add(fullName);
+
+  const parts = fullName.trim().split(/\s+/);
+  if (parts.length < 2) return [fullName];
+
+  const lastName = parts[parts.length - 1];
+  const givenNames = parts.slice(0, -1);
+
+  // 1. 缩写形式: "Z.-X. Shen"
+  const initials = givenNames
+    .map(n => n.charAt(0).toUpperCase() + '.')
+    .join('-');
+  aliases.add(`${initials} ${lastName}`);
+  aliases.add(`${initials.replace(/-/g, ' ')} ${lastName}`);
+
+  // 2. 无连字符: "Z X Shen"
+  aliases.add(`${givenNames.map(n => n.charAt(0).toUpperCase()).join(' ')} ${lastName}`);
+
+  // 3. 全名无连字符: "Zhixun Shen"
+  const fullGiven = givenNames.join('')
+    .replace(/[^a-zA-ZÀ-ɏ]/g, '');
+  if (fullGiven !== givenNames.join(' ')) {
+    aliases.add(`${fullGiven} ${lastName}`);
+  }
+
+  // 4. 姓在前: "Shen Zhi-Xun" (中文习惯)
+  aliases.add(`${lastName} ${givenNames.join('-')}`);
+  aliases.add(`${lastName} ${initials.replace(/\./g, '')}`);
+
+  // 5. 姓在前, 名在后无空格: "Shen Zhixun"
+  aliases.add(`${lastName} ${fullGiven}`);
+
+  return Array.from(aliases);
+}
+
+/**
+ * 跨语言姓名匹配 — 支持中/英/日/韩
+ * 返回 0-1 的匹配分数
+ */
+export function crossLanguageNameMatch(name1: string, name2: string): number {
+  const n1 = name1.trim().toLowerCase();
+  const n2 = name2.trim().toLowerCase();
+
+  // 精确匹配
+  if (n1 === n2) return 1.0;
+
+  // 一方包含另一方
+  if (n1.includes(n2) || n2.includes(n1)) return 0.9;
+
+  // 生成双方的别名集合
+  const aliases1 = new Set(generateNameAliases(name1).map(a => a.toLowerCase()));
+  const aliases2 = generateNameAliases(name2).map(a => a.toLowerCase());
+
+  // 任一别名匹配
+  for (const a2 of aliases2) {
+    if (aliases1.has(a2)) return 0.95;
+  }
+
+  // 词序匹配 (分词后再排序比较)
+  const parts1 = n1.split(/[\s-]+/).sort().join(' ');
+  const parts2 = n2.split(/[\s-]+/).sort().join(' ');
+  if (parts1 === parts2) return 0.85;
+
+  // 模糊: Levenshtein 距离
+  const dist = editDistance(n1, n2);
+  const maxLen = Math.max(n1.length, n2.length);
+  const similarity = 1 - dist / maxLen;
+  if (similarity > 0.85) return 0.7;
+  if (similarity > 0.75) return 0.5;
+
+  return 0;
+}
+
+/** 判断是否为 CJK 姓名 (中/日/韩) */
+export function isCJKName(name: string): boolean {
+  return /[一-鿿぀-ゟ゠-ヿ가-힯]/.test(name);
+}
+
+
 // -- Helpers ---------------------------------------------------------------
 
 function hasChinese(text: string): boolean {
@@ -186,4 +275,64 @@ function editDistance(a: string, b: string): number {
     for (let j = 1; j <= n; j++)
       dp[i][j] = a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
   return dp[m][n];
+}
+
+// -- 统一人名/机构名规范化 -----------------------------------------------
+
+/**
+ * 去重用规范化：小写 → 去非字母 → 分词排序 → 合并。
+ * 词序无关，用于模糊去重（"Ding Hong" ↔ "Hong Ding"）。
+ */
+export function normalizeNameForDedup(name: string): string {
+  if (!name) return '';
+  return name
+    .toLowerCase()
+    .replace(/[^a-z\s]/g, '')
+    .split(/\s+/)
+    .sort()
+    .join(' ')
+    .trim();
+}
+
+/**
+ * 精确匹配用规范化：小写 → 去非字母/空格 → 合并空白。
+ * 保留词序，用于精确姓名匹配。
+ */
+export function normalizeNameExact(name: string): string {
+  if (!name) return '';
+  return name
+    .toLowerCase()
+    .replace(/[^a-z\s]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Unicode 宽容规范化：小写 → 保留重音拉丁字符和连字符 → 规范化空白。
+ * 用于跨语言姓名匹配。与 normalizeNameExact 的区别是保留 À-ɏ 范围的字符。
+ */
+export function normalizeNameUnicode(name: string): string {
+  if (!name) return '';
+  return name
+    .toLowerCase()
+    .replace(/[^a-zÀ-ɏ\s-]/g, '')
+    .replace(/[-\s]+/g, ' ')
+    .trim();
+}
+
+/**
+ * 机构名规范化：小写 → 去非字母 → 剔除常见停用词 → 保留长度>1的词 → 排序。
+ * 返回哨兵值 `_no_institution_` 防止空名误合并。
+ */
+export function normalizeInstitution(name: string): string {
+  if (!name) return '_no_institution_';
+  const normalized = name
+    .toLowerCase()
+    .replace(/[^a-z\s]/g, '')
+    .replace(/\b(university|institute|college|school|of|the|and|department|center|for|research|lab|laboratory|national|international)\b/g, '')
+    .split(/\s+/)
+    .filter(w => w.length > 1)
+    .sort()
+    .join(' ');
+  return normalized || '_no_institution_';
 }

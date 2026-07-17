@@ -67,51 +67,110 @@ async function runScheduledTask(
 }
 
 // ---------------------------------------------------------------------------
-// Seed sources — known ARPES labs, institutions, and researchers
+// 关键词驱动的种子生成
+//
+// 环境变量 SEED_KEYWORDS="keyword1, keyword2, ..." 驱动所有爬取。
+// 未设置时回退到默认关键词列表。
+//
+// 每个关键词生成三级爬取任务:
+//   TIER_1: 从大学域名列表中搜索 faculty 目录 (priority=1)
+//   TIER_2: arXiv 搜索 (priority=3)
+//   TIER_3: Google Scholar 搜索 (priority=5)
 // ---------------------------------------------------------------------------
-const ARPES_SEEDS: Record<SourceType, string[]> = {
-  'lab-homepage': [
-    'https://www.phas.ubc.ca/arpes',
-    'https://www.stanford.edu/group/topological-materials/',
-    'https://www.phas.ubc.ca/~quantmat/',
-  ],
-  'personal-homepage': [
-    'https://physics.stanford.edu/people/faculty/zhi-xun-shen',
-    'https://www.phas.ubc.ca/users/andrea-damascelli',
-  ],
-  'arxiv': [
-    'ARPES',
+
+function getKeywords(): string[] {
+  const env = process.env.SEED_KEYWORDS;
+  if (env) {
+    return env.split(',').map(k => k.trim()).filter(Boolean);
+  }
+  // 默认关键词 — 可通过 API 或配置文件覆盖
+  return [
     'angle-resolved photoemission',
-    'topological insulator ARPES',
-    'high-Tc superconductor ARPES',
-  ],
-  'google-scholar': [],
-  'institutional': [],
-  'conference': [],
-  'journal': [],
-  'custom': [],
-};
+    'topological materials',
+    'high temperature superconductivity',
+    'quantum computing',
+    'CRISPR gene editing',
+  ];
+}
+
+interface TieredSeed {
+  seeds: string[];
+  sourceType: SourceType;
+  tier: 'TIER_1_OFFICIAL' | 'TIER_2_ACADEMIC' | 'TIER_3_WEB';
+}
+
+function buildSeeds(keywords: string[]): TieredSeed[] {
+  const seeds: TieredSeed[] = [];
+
+  // === TIER 1: 大学官网 faculty 目录 (永久种子，不限关键词) ===
+  // 全球顶级大学的 physics/chemistry/biology/engineering 系列 faculty 页面
+  const FACULTY_URLS = [
+    // 北美
+    'https://physics.stanford.edu/people/faculty',
+    'https://physics.mit.edu/faculty',
+    'https://physics.berkeley.edu/people/faculty',
+    'https://www.physics.harvard.edu/people/faculty',
+    'https://phas.ubc.ca/faculty',
+    'https://pma.caltech.edu/people/faculty',
+    'https://physics.princeton.edu/people/faculty',
+    // 欧洲
+    'https://www.physik.uni-wuerzburg.de/en/ep4/team',
+    'https://www.synchrotron-soleil.fr/en/beamlines',
+    // 东亚
+    'http://english.iop.cas.cn/peoples/faculty/',
+    'https://phys.fudan.edu.cn',
+    'https://kondo.issp.u-tokyo.ac.jp',
+  ];
+  seeds.push({ sourceType: 'institutional', tier: 'TIER_1_OFFICIAL', seeds: FACULTY_URLS });
+
+  // === TIER 2: arXiv 搜索 (每个关键词一个查询) ===
+  seeds.push({ sourceType: 'arxiv', tier: 'TIER_2_ACADEMIC', seeds: keywords });
+
+  // === TIER 3: Google Scholar/WWW (每个关键词一个查询) ===
+  seeds.push({ sourceType: 'google-scholar', tier: 'TIER_3_WEB', seeds: keywords });
+
+  return seeds;
+}
+
+/** 运行时缓存的种子列表，由 getKeywords() 和 buildSeeds() 生成 */
+let _cachedSeeds: TieredSeed[] | null = null;
+
+function getSeeds(): TieredSeed[] {
+  if (!_cachedSeeds) {
+    _cachedSeeds = buildSeeds(getKeywords());
+  }
+  return _cachedSeeds;
+}
 
 // ---------------------------------------------------------------------------
 // Scheduled task: Daily re-crawl (2 AM)
+// TIER_1 → priority=1, maxPages=100; TIER_2 → priority=3, maxPages=50
 // ---------------------------------------------------------------------------
 async function runDailyCrawl(): Promise<void> {
   const taskName = 'daily-crawl';
-  logger.info('Starting daily re-crawl...');
+  const keywords = getKeywords();
+  logger.info({ keywords }, 'Starting daily tiered crawl');
 
   await runScheduledTask(taskName, async () => {
-    const labSeeds = ARPES_SEEDS['lab-homepage'];
-    if (labSeeds.length > 0) {
-      await crawlQueue.add('daily-crawl-labs', {
-        seeds: labSeeds, sourceType: 'lab-homepage', maxPagesPerSeed: 50, depth: 2,
-      }, { priority: 2, removeOnComplete: { count: 100 }, removeOnFail: { count: 100 } });
-    }
+    const seedGroups = getSeeds();
 
-    const arxivSeeds = ARPES_SEEDS['arxiv'];
-    if (arxivSeeds.length > 0) {
-      await crawlQueue.add('daily-crawl-arxiv', {
-        seeds: arxivSeeds, sourceType: 'arxiv', maxPagesPerSeed: 30, depth: 1,
-      }, { priority: 3, removeOnComplete: { count: 100 }, removeOnFail: { count: 100 } });
+    for (const seedGroup of seedGroups) {
+      if (seedGroup.seeds.length === 0) continue;
+
+      const isTier1 = seedGroup.tier === 'TIER_1_OFFICIAL';
+      const isTier2 = seedGroup.tier === 'TIER_2_ACADEMIC';
+
+      await crawlQueue.add(`daily-${seedGroup.sourceType}-${seedGroup.tier}`, {
+        seeds: seedGroup.seeds,
+        sourceType: seedGroup.sourceType,
+        tier: seedGroup.tier,
+        maxPagesPerSeed: isTier1 ? 100 : isTier2 ? 50 : 30,
+        depth: 2,
+      }, {
+        priority: isTier1 ? 1 : isTier2 ? 3 : 5,
+        removeOnComplete: { count: 100 },
+        removeOnFail: { count: 100 },
+      });
     }
   });
 }
@@ -148,18 +207,26 @@ async function runGraphUpdate(): Promise<void> {
 // ---------------------------------------------------------------------------
 async function runWeeklyDiscovery(): Promise<void> {
   const taskName = 'weekly-discovery';
-  logger.info('Starting weekly discovery...');
+  const keywords = getKeywords();
+  logger.info({ keywords }, 'Starting weekly discovery');
 
   await runScheduledTask(taskName, async () => {
-    await discoveryQueue.add('weekly-discovery', {
-      method: 'citation-graph', sources: ['arxiv', 'crossref', 'dblp'],
-      maxNewNodes: 200, minConfidence: 0.7,
+    // arXiv 引用网络发现
+    await discoveryQueue.add('weekly-discovery-arxiv', {
+      method: 'citation-graph',
+      sources: ['arxiv', 'crossref'],
+      queries: keywords,
+      maxNewNodes: 200,
+      minConfidence: 0.7,
     }, { priority: 1, removeOnComplete: { count: 20 }, removeOnFail: { count: 20 } });
 
+    // Web 搜索发现
     await discoveryQueue.add('weekly-discovery-web', {
-      method: 'web-search', sources: ['google-scholar', 'researchgate'],
-      queries: ['ARPES angle-resolved photoemission spectroscopy 2025', 'ARPES lab new group', 'ARPES topological materials'],
-      maxNewNodes: 100, minConfidence: 0.6,
+      method: 'web-search',
+      sources: ['google-scholar', 'researchgate'],
+      queries: keywords.map(k => `${k} research group latest`),
+      maxNewNodes: 100,
+      minConfidence: 0.6,
     }, { priority: 2, removeOnComplete: { count: 20 }, removeOnFail: { count: 20 } });
   });
 }
@@ -180,6 +247,35 @@ async function runValidation(): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Scheduled task: Auto seed discovery (Monday 3AM)
+// 从图谱中自动发现高影响力但缺少完整信息的研究者 → 加入种子队列
+// ---------------------------------------------------------------------------
+async function runAutoSeedFinder(): Promise<void> {
+  const taskName = 'auto-seed-finder';
+  logger.info('Starting auto seed discovery...');
+
+  await runScheduledTask(taskName, async () => {
+    // 发现缺少 homepage/ORCID 的高引用研究者
+    const candidates: { name: string; uuid: string; totalCitations: number }[] = [];
+    try {
+      // 简化版: 通过 Neo4j Cypher 发现 (如果是完整实现则通过 CitationAnalyzer)
+      // 此处通过 crawl queue 触发发现作业
+      await discoveryQueue.add('auto-seed-discovery', {
+        method: 'citation-graph',
+        sources: ['semantic-scholar'],
+        maxNewNodes: 50,
+        minConfidence: 0.6,
+        queries: ['highly cited researcher'], // S2 会按引用排序
+      }, { priority: 3, removeOnComplete: { count: 20 }, removeOnFail: { count: 20 } });
+
+      logger.info({ candidatesFound: candidates.length }, 'Auto seed candidates discovered');
+    } catch (err: any) {
+      logger.warn(`Auto seed discovery failed: ${err.message}`);
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Cron schedule definitions
 // ---------------------------------------------------------------------------
 interface CronEntry {
@@ -194,6 +290,7 @@ const schedules: CronEntry[] = [
   { cron: '0 6 * * *',    name: 'graph-update',       handler: runGraphUpdate },
   { cron: '0 7 * * *',    name: 'graph-validation',   handler: runValidation },
   { cron: '0 12 * * 0',   name: 'weekly-discovery',   handler: runWeeklyDiscovery }, // Sunday noon
+  { cron: '0 3 * * 1',    name: 'auto-seed-finder',    handler: runAutoSeedFinder },  // Monday 3AM
 ];
 
 // ---------------------------------------------------------------------------

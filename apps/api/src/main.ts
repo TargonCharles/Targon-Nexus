@@ -14,11 +14,11 @@ async function bootstrap() {
     logger: ['log', 'error', 'warn', 'debug', 'verbose'],
   });
 
-  // --- CORS ---
+  // --- CORS (允许所有 localhost 端口) ---
   const corsOriginRaw = process.env.CORS_ORIGIN?.trim();
   const corsOrigin = corsOriginRaw
     ? corsOriginRaw.split(',').map((s) => s.trim()).filter(Boolean)
-    : ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002'];
+    : [/^http:\/\/localhost:\d+$/];
 
   app.enableCors({
     origin: corsOrigin,

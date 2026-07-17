@@ -13,10 +13,10 @@
     "@arp/shared": "workspace:*",
     "@arp/types": "workspace:*",
     "bullmq": "^5.1.0",
-    "crawlee": "^3.7.0",
     "ioredis": "^5.3.2",
     "playwright": "^1.41.0",
-    "robots-parser": "^3.0.1"
+    "robots-parser": "^3.0.1",
+    "turndown": "^7.1.0"
   },
   "devDependencies": {
     "@arp/eslint-config": "workspace:*",

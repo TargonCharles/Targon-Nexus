@@ -1,6 +1,10 @@
 // =============================================================================
 // Targon Nexus — 自动发现爬虫
-// 从 arXiv / Semantic Scholar API 自动发现新的 ARPES 研究者、实验室、论文
+// 从 arXiv / Semantic Scholar API 根据关键词自动发现研究者、实验室、论文
+//
+// 用法:
+//   npx ts-node discover.ts "quantum computing" "CRISPR"
+//   或设置环境变量 SEED_KEYWORDS="keyword1, keyword2"
 // =============================================================================
 
 import * as fs from 'fs';
@@ -9,29 +13,28 @@ import * as path from 'path';
 // — arXiv API 配置 —
 const ARXIV_API = 'https://export.arxiv.org/api/query';
 
-// ARPES 核心搜索关键词
-const ARPES_QUERIES = [
-  'angle-resolved photoemission',
-  'ARPES spectroscopy',
-  'topological insulator ARPES',
-  'high-Tc superconductor ARPES',
-  'iron-based superconductor ARPES',
-  'kagome metal ARPES',
-  'spin-resolved ARPES',
-  'time-resolved ARPES',
-  'Weyl semimetal ARPES',
-  'Dirac semimetal ARPES',
-  'cuprate superconductor Fermi surface',
-  'quantum materials photoemission',
-  'strongly correlated ARPES',
-  '2D materials ARPES',
-  'charge density wave ARPES',
-  'topological superconductor ARPES',
-  'nickelate superconductor',
-  'moiré material ARPES',
-  'nano ARPES',
-  'laser ARPES',
-];
+/**
+ * 获取搜索关键词:
+ *   1. 命令行参数优先
+ *   2. 环境变量 SEED_KEYWORDS 次之
+ *   3. 默认关键词兜底
+ */
+function getQueries(): string[] {
+  const args = process.argv.slice(2).filter(a => !a.startsWith('--'));
+  if (args.length > 0) return args;
+
+  const env = process.env.SEED_KEYWORDS;
+  if (env) return env.split(',').map(k => k.trim()).filter(Boolean);
+
+  // 默认 — 通用热门研究领域
+  return [
+    'angle-resolved photoemission',
+    'topological materials',
+    'high temperature superconductivity',
+    'quantum computing',
+    'CRISPR gene editing',
+  ];
+}
 
 interface ArxivEntry {
   id: string;
@@ -180,17 +183,17 @@ function writeDiscoveredCSV(
 // — 主入口 —
 async function main() {
   console.log('╔══════════════════════════════════════════════════════╗');
-  console.log('║   Targon Nexus — 自动发现爬虫                         ║');
+  console.log('║   Targon Nexus — 自动发现爬虫 (关键词驱动)           ║');
   console.log('╚══════════════════════════════════════════════════════╝\n');
 
   const outputDir = path.resolve(__dirname, '../datasets/discovered');
   const allPeople: DiscoveredPerson[] = [];
   const allPapers: DiscoveredPaper[] = [];
 
-  const queryLimit = parseInt(process.env.DISCOVERY_QUERY_COUNT || '5', 10);
-  const queries = ARPES_QUERIES.slice(0, queryLimit);
+  const queryLimit = parseInt(process.env.DISCOVERY_QUERY_COUNT || '10', 10);
+  const queries = getQueries().slice(0, queryLimit);
 
-  console.log(`  🔍 搜索 ${queries.length} 个 ARPES 关键词...\n`);
+  console.log(`  🔍 搜索 ${queries.length} 个关键词...\n`);
 
   for (let i = 0; i < queries.length; i++) {
     const query = queries[i];

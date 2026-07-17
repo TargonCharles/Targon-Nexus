@@ -21,7 +21,13 @@
       "@arp/shared": ["../../packages/shared/src"],
       "@arp/shared/*": ["../../packages/shared/src/*"],
       "@arp/types": ["../../packages/types/src"],
-      "@arp/types/*": ["../../packages/types/src/*"]
+      "@arp/types/*": ["../../packages/types/src/*"],
+      "@arp/crawler": ["../../apps/crawler/src"],
+      "@arp/crawler/*": ["../../apps/crawler/src/*"],
+      "@arp/extractor": ["../../apps/extractor/src"],
+      "@arp/extractor/*": ["../../apps/extractor/src/*"],
+      "@arp/graph-builder": ["../../apps/graph-builder/src"],
+      "@arp/graph-builder/*": ["../../apps/graph-builder/src/*"]
     }
   },
   "include": ["src/**/*"],

@@ -694,11 +694,36 @@ export type SourceType =
   | "journal"
   | "custom";
 
+// -- Source Quality Tiers ----------------------------------------------------
+
+/** 信源等级 — 信息源权威性分级 */
+export type SourceTier = 'TIER_1_OFFICIAL' | 'TIER_2_ACADEMIC' | 'TIER_3_WEB' | 'TIER_4_OTHER';
+
+/** 每条爬取信息的质量评分 */
+export interface SourceQuality {
+  tier: SourceTier;
+  baseScore: number;        // 信源等级基础分 (100/80/60/40)
+  freshnessScore: number;   // 时效性分 (0-1, 指数衰减)
+  completenessScore: number; // 信息完整度 (0-1)
+  crossSourceBonus: number;  // 多来源交叉验证加分
+  totalScore: number;        // 加权总分
+  scoredAt: string;          // ISO 评分时间
+}
+
+/** SourceTier → 默认爬取配置 */
+export const TIER_DEFAULTS: Record<SourceTier, { priority: number; maxPagesPerSeed: number; depth: number }> = {
+  TIER_1_OFFICIAL: { priority: 1, maxPagesPerSeed: 100, depth: 2 },
+  TIER_2_ACADEMIC:  { priority: 3, maxPagesPerSeed: 50,  depth: 2 },
+  TIER_3_WEB:       { priority: 5, maxPagesPerSeed: 30,  depth: 1 },
+  TIER_4_OTHER:     { priority: 8, maxPagesPerSeed: 20,  depth: 1 },
+};
+
 // -- Crawl -------------------------------------------------------------------
 
 export interface CrawlJob {
   seeds: string[];
   sourceType: SourceType;
+  tier?: SourceTier;
   maxPagesPerSeed?: number;
   depth?: number;
 }
@@ -707,9 +732,18 @@ export interface CrawledPage {
   url: string;
   title: string;
   textContent: string;
+  /** Markdown 格式内容 (替代 raw innerText, 更利于 LLM 消费) */
+  markdownContent?: string;
   contentType: string;
   crawledAt: string;
+  /** HTTP Last-Modified header */
+  lastModified?: string;
+  /** 页面内容中检测到的日期 */
+  pageDate?: string;
   links: string[];
+  /** 页面类型: faculty-directory | lab-homepage | paper-abstract | personal-profile | generic */
+  pageType?: string;
+  sourceQuality?: SourceQuality;
   metadata: Record<string, unknown>;
   rawBuffer?: string; // base64 for PDFs
 }
